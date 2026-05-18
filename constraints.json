@@ -1,0 +1,33 @@
+{
+  "client_metadata": {
+    "name": "Udit Khot",
+    "age": 30,
+    "height_cm": 172,
+    "weight_kg": 65,
+    "surgical_history": [
+      {
+        "condition": "Splenectomy",
+        "year": 2017,
+        "notes": "Ruptured spleen from bike accident. Abdominal scar present. Focus on long-term immune support via diet."
+      }
+    ]
+  },
+  "medical_guardrails": {
+    "dietary_exclusions": ["maida", "bakery_products", "excessive_cheese", "groundnut_gravy", "coconut_gravy"],
+    "dietary_reductions": ["sugar", "potato", "dairy", "high_oil"],
+    "mandatory_daily_inclusions": {
+      "protein_katori_0_75": ["dal", "soyabean", "sprouts", "paneer", "mushroom", "rajma", "chole", "egg", "chicken", "fish"],
+      "nuts": {"soaked_almonds": 5, "walnuts": 2},
+      "blood_health_portion": ["green_veg", "beetroot", "dates", "jaggery", "black_raisins", "meat"],
+      "fermented_or_probiotic": ["idli", "dosa", "dhokla", "curd_probiotic"]
+    },
+    "hydration_target_liters": 4.0,
+    "supplement_tracking": {
+      "weekly": ["Cholecalciferol 60000 IU (Vitamin D3)"]
+    }
+  },
+  "routine_overrides": {
+    "sleep_window": "22:00-05:00",
+    "mandatory_exercises": ["Sarvangasana", "Sirsasana"]
+  }
+}

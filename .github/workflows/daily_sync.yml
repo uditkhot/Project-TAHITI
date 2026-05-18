@@ -1,0 +1,19 @@
+name: Daily Health Sync
+on:
+  schedule:
+    - cron: '30 1 * * *' # Triggers daily at 7:00 AM IST
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+      - name: Install Dependencies
+        run: pip install google-api-python-client google-auth-httplib2 google-auth-oauthlib
+      - name: Execute Sync Engine
+        env:
+          GOOGLE_TASKS_TOKEN: ${{ secrets.GOOGLE_TASKS_TOKEN }}
+        run: python sync_health.py
