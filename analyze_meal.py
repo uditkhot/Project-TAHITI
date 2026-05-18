@@ -10,27 +10,25 @@ REPO = os.environ.get("GITHUB_REPOSITORY")
 
 client = genai.Client(api_key=os.environ.get("GEMINI_API_KEY"))
 
-def download_github_asset(url, headers):
+def download_github_asset(url, auth_headers):
     """
-    Downloads an issue image asset safely by stripping out authorization 
-    headers if GitHub redirects the download request to an AWS S3 bucket.
+    Manually unpacks redirects to strip GitHub auth tokens 
+    before requesting binary content from external AWS S3 nodes.
     """
-    session = requests.Session()
+    # 1. Fire an explicit request to GitHub with redirection disabled
+    response = requests.get(url, headers=auth_headers, allow_redirects=False)
     
-    # Define a custom hook to intercept and clean headers on redirect
-    def clear_auth_on_redirect(response, **kwargs):
-        if response.is_redirect or response.status_code in [301, 302, 307, 308]:
-            redirect_url = response.headers.get('Location')
-            # If redirected away from github.com (e.g., to AWS S3), drop the token
-            if "github.com" not in redirect_url:
-                session.headers.pop("Authorization", None)
-                
-    session.hooks['response'].append(clear_auth_on_redirect)
-    session.headers.update(headers)
-    
-    # Execute file stream retrieval
-    res = session.get(url, allow_redirects=True)
-    return res.content
+    # 2. Extract the authenticated redirection location from the 302/301 stream
+    if response.status_code in [301, 302, 307, 308] and 'Location' in response.headers:
+        redirect_url = response.headers['Location']
+        print(f"[JARVIS] Redirection target identified. Initializing clean extraction channel...")
+        
+        # 3. Request the raw binary from S3 with absolutely zero authorization headers
+        binary_response = requests.get(redirect_url, allow_redirects=True)
+        return binary_response.content
+        
+    # Fallback if GitHub didn't redirect (asset served natively)
+    return response.content
 
 def process_github_issues_as_meals():
     if not GITHUB_TOKEN or not REPO:
@@ -95,7 +93,7 @@ def process_github_issues_as_meals():
         img_url = img_match.group(1)
         print(f"[JARVIS] Handshaking secure download for asset link: {title}")
         
-        # Use our fortified redirection-safe downloading asset worker
+        # Deploy manual redirect-cleansing download worker
         img_bytes = download_github_asset(img_url, headers)
 
         try:
