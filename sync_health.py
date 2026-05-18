@@ -62,7 +62,6 @@ def main():
     list_id = get_or_create_list(service, "Health & Fitness")
     today = datetime.date.today().isoformat()
     
-    # 1. Master Plan Parent Task (De-duplication gate)
     master_title = f"⚠️ APPROVE PLAN: Matrix {today}"
     exists, master_id = task_exists(service, list_id, master_title, today)
     
@@ -77,22 +76,22 @@ def main():
     }).execute()
     master_id = master_task['id']
 
-    # 2. Section: Time-Table Schedule
+    # Updated 06:00 AM Master Timeline Blocks
     schedule_parent = service.tasks().insert(tasklist=list_id, body={
-        "title": "⏰ Morning Timeline Blocks",
+        "title": "⏰ Morning Timeline Blocks (6AM Start)",
         "parent": master_id,
         "due": today + "T00:00:00Z"
     }).execute()
     
-    create_subtask(service, list_id, schedule_parent['id'], "05:00 AM | Wake Up & Hydrate (500ml Water)")
-    create_subtask(service, list_id, schedule_parent['id'], "05:15 AM | Execute Morning Exertion Workout")
-    create_subtask(service, list_id, schedule_parent['id'], "05:45 AM | Prepare Prescribed Breakfast")
-    create_subtask(service, list_id, schedule_parent['id'], "06:15 AM | Consume Breakfast & Log")
+    create_subtask(service, list_id, schedule_parent['id'], "06:00 AM | Wake Up & Hydrate (500ml Water)")
+    create_subtask(service, list_id, schedule_parent['id'], "06:15 AM | Execute Morning Exertion (Workout + Yoga)")
+    create_subtask(service, list_id, schedule_parent['id'], "07:00 AM | Cool Down & Prepare Prescribed Breakfast")
+    create_subtask(service, list_id, schedule_parent['id'], "07:30 AM | Consume Breakfast & Log")
 
-    # 3. Section: Specific Exercise Execution
+    # Exercise Execution Block (Extended to 45 mins)
     workout_name, movements = generate_dynamic_plan()
     workout_parent = service.tasks().insert(tasklist=list_id, body={
-        "title": f"🏋️ Morning Exertion: {workout_name}",
+        "title": f"🏋️ Morning Exertion (06:15 - 07:00): {workout_name}",
         "parent": master_id,
         "due": today + "T00:00:00Z"
     }).execute()
@@ -100,7 +99,7 @@ def main():
     for movement in movements:
         create_subtask(service, list_id, workout_parent['id'], movement)
 
-    # 4. Section: Dietary Inclusions (Medical Constraints)
+    # Dietary Guardrails
     diet_parent = service.tasks().insert(tasklist=list_id, body={
         "title": "🍴 Nutrition & Medical Constraints",
         "parent": master_id,
@@ -112,7 +111,7 @@ def main():
     create_subtask(service, list_id, diet_parent['id'], "Blood/Iron Health: 1 Portion Green Veg / Beetroot / Dates")
     create_subtask(service, list_id, diet_parent['id'], "Brain Fats: 5 Soaked Almonds + 2 Walnuts")
 
-    print(f"[JARVIS] Matrix successfully deployed with structural subtask nesting.")
+    print(f"[JARVIS] Matrix successfully updated to 06:00 AM parameters.")
 
 if __name__ == "__main__":
     main()
