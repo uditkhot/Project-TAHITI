@@ -2,7 +2,7 @@ name: Daily Health Sync
 on:
   schedule:
     - cron: '30 23 * * *' # Triggers at exactly 11:30 PM UTC (5:00 AM IST)
-  workflow_dispatch: 
+  workflow_dispatch:     # Manual override trigger button
 
 jobs:
   sync:
@@ -16,10 +16,14 @@ jobs:
         with:
           python-version: '3.10'
 
-      - name: Install Google Dependencies
-        run: pip install google-api-python-client google-auth-httplib2 google-auth-oauthlib
+      - name: Install All Python Dependencies
+        run: |
+          pip install google-api-python-client google-auth-httplib2 google-auth-oauthlib
+          pip install google-genai
+          # Added the missing core AI package to patch the 'genai' unknown location error
 
-      - name: Execute Sync Engine
+      - name: Execute Dynamic Sync Engine
         env:
           GOOGLE_TASKS_TOKEN: ${{ secrets.GOOGLE_TASKS_TOKEN }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: python sync_health.py
