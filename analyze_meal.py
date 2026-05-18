@@ -5,18 +5,38 @@ import requests
 from google import genai
 from google.genai import types
 
-# Automatically generated context parameters provided securely by the Actions environment
 GITHUB_TOKEN = os.environ.get("GITHUB_TOKEN")
 REPO = os.environ.get("GITHUB_REPOSITORY") 
 
 client = genai.Client(api_key=os.environ.get("GEMINI_API_KEY"))
+
+def download_github_asset(url, headers):
+    """
+    Downloads an issue image asset safely by stripping out authorization 
+    headers if GitHub redirects the download request to an AWS S3 bucket.
+    """
+    session = requests.Session()
+    
+    # Define a custom hook to intercept and clean headers on redirect
+    def clear_auth_on_redirect(response, **kwargs):
+        if response.is_redirect or response.status_code in [301, 302, 307, 308]:
+            redirect_url = response.headers.get('Location')
+            # If redirected away from github.com (e.g., to AWS S3), drop the token
+            if "github.com" not in redirect_url:
+                session.headers.pop("Authorization", None)
+                
+    session.hooks['response'].append(clear_auth_on_redirect)
+    session.headers.update(headers)
+    
+    # Execute file stream retrieval
+    res = session.get(url, allow_redirects=True)
+    return res.content
 
 def process_github_issues_as_meals():
     if not GITHUB_TOKEN or not REPO:
         print("[JARVIS] Structural Error: System running without valid GitHub context keys.")
         return
 
-    # 1. Fetch all open issues inside your Project-TAHITI repository
     headers = {
         "Authorization": f"token {GITHUB_TOKEN}",
         "Accept": "application/vnd.github.v3+json"
@@ -28,15 +48,14 @@ def process_github_issues_as_meals():
         print("[JARVIS] Clean environment checklist: No active intake tracking issues open.")
         return
 
-    print(f"[JARVIS] Found {len(issues)} open logging issues to process...")
+    print(f"[JARVIS] Scanning {len(issues)} open intake track issues...")
 
     prompt_template = """
     You are Udit Khot's dedicated clinical dietician vision model.
     Analyze this meal snapshot and calculate the estimated macronutrients.
     
     CULINARY OVERRIDE NOTE:
-    The user has titled this log entry: "{issue_title}". Use this textual string to anchor your classification.
-    Look closely at the texture to differentiate irregular egg folds from pancake mixes.
+    The user has titled this log entry: "{issue_title}". Use this text identifier to anchor your classification.
     
     MEDICAL RULES TO ENFORCE:
     - Exclude or minimize: Maida, bakery items, potatoes, heavy cheese, and high cooking oil.
@@ -56,27 +75,28 @@ def process_github_issues_as_meals():
         title = issue["title"].strip()
         body = issue.get("body", "") or ""
 
-        # Check if the title is a quick Pantry text string update instead of a meal photo
+        # Process Pantry string text overrides
         if title.lower().startswith("pantry:") or title.lower().startswith("out of"):
-            print(f"[JARVIS] Overwriting grocery tracking profile text from Issue #{issue_id}...")
+            print(f"[JARVIS] Extracting grocery note data from Issue #{issue_id}...")
             with open("inventory_note.txt", "w") as f:
                 f.write(title + "\n" + body)
                 
-            # Close the text tracking issue cleanly
             close_url = f"https://api.github.com/repos/{REPO}/issues/{issue_id}"
             requests.patch(close_url, headers=headers, json={"state": "closed", "labels": ["pantry-updated-by-jarvis"]})
             continue
 
-        # Extract markdown image addresses generated natively by the GitHub Android Application
+        # Extract markdown image links
         img_match = re.search(r'\!\[.*?\]\((https://github\.com/.*?)\)', body)
         
         if not img_match:
-            print(f"[JARVIS] Issue #{issue_id} ({title}) does not contain binary media attachments. Skipping processing.")
+            print(f"[JARVIS] Issue #{issue_id} ({title}) does not contain a valid image attachment. Skipping.")
             continue
 
         img_url = img_match.group(1)
-        print(f"[JARVIS] Downloading raw binary image data stream from GitHub Asset Storage for: {title}")
-        img_bytes = requests.get(img_url, headers=headers).content
+        print(f"[JARVIS] Handshaking secure download for asset link: {title}")
+        
+        # Use our fortified redirection-safe downloading asset worker
+        img_bytes = download_github_asset(img_url, headers)
 
         try:
             image_part = types.Part.from_bytes(data=img_bytes, mime_type="image/jpeg")
@@ -88,10 +108,9 @@ def process_github_issues_as_meals():
             )
             
             analysis_result = json.loads(response.text)
-            print(f"[JARVIS] Classification complete for Issue #{issue_id}.")
+            print(f"[JARVIS] Analysis finalized for Issue #{issue_id}.")
             append_to_history(analysis_result)
             
-            # Close the tracking issue to keep the board empty and clean
             close_url = f"https://api.github.com/repos/{REPO}/issues/{issue_id}"
             requests.patch(close_url, headers=headers, json={"state": "closed", "labels": ["processed-by-jarvis"]})
             
