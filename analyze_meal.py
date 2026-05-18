@@ -86,13 +86,19 @@ def append_to_history(data):
     history_file = 'meal_history.json'
     if os.path.exists(history_file):
         with open(history_file, 'r') as f:
-            history = json.load(f)
+            try:
+                history = json.load(f)
+                if not isinstance(history, list):
+                    history = [history]
+            except json.JSONDecodeError:
+                history = []
     else:
         history = []
         
     history.append(data)
     with open(history_file, 'w') as f:
-        json.dump(history, indent=2)
+        # FIXED: Explicitly passed the file pointer 'f' as the second positional argument
+        json.dump(history, f, indent=2)
 
 if __name__ == "__main__":
     process_new_meal_images()
