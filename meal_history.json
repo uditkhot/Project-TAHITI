@@ -1,0 +1,15 @@
+[
+  {
+    "meal_estimation": "Besan Chilla (savory chickpea flour pancake) with vegetables and black tea",
+    "nutrients": {
+      "calories": 240,
+      "protein_g": 10,
+      "carbs_g": 30,
+      "fat_g": 10
+    },
+    "guardrail_alerts": [
+      "Monitor cooking oil usage to ensure it remains minimal."
+    ],
+    "medical_compliance_notes": "The meal is compliant, as it excludes maida, bakery items, potatoes, heavy cheese, and appears to use cooking oil in a moderate amount. The besan chilla is a good source of plant-based protein and fiber, positively contributing to daily protein and gut health goals."
+  }
+]
