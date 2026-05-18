@@ -2,19 +2,24 @@ name: Daily Health Sync
 on:
   schedule:
     - cron: '30 1 * * *' # Triggers daily at 7:00 AM IST
-  workflow_dispatch:     # <--- ADD THIS LINE (Must be exactly aligned)
+  workflow_dispatch:     # Allows manual trigger overrides
 
 jobs:
   sync:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
-      - name: Set up Python
-        uses: actions/setup-python@v4
+      - name: Checkout Codebase
+        uses: actions/checkout@v4 # Upgraded to support Node.js 24 safely
+
+      - name: Set up Python Environment
+        uses: actions/setup-python@v5 # Upgraded to support Node.js 24 safely
         with:
           python-version: '3.10'
-      - name: Install Dependencies
+          cache: 'pip' # Optional: Speeds up subsequent workflow runs
+
+      - name: Install Google Dependencies
         run: pip install google-api-python-client google-auth-httplib2 google-auth-oauthlib
+
       - name: Execute Sync Engine
         env:
           GOOGLE_TASKS_TOKEN: ${{ secrets.GOOGLE_TASKS_TOKEN }}
