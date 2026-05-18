@@ -1,5 +1,15 @@
 {
-  "rewrites": [
-    { "source": "/api/whatsapp", "destination": "api/whatsapp.py" }
+  "version": 2,
+  "builds": [
+    {
+      "src": "api/whatsapp.py",
+      "use": "@vercel/python"
+    }
+  ],
+  "routes": [
+    {
+      "src": "/api/whatsapp",
+      "dest": "api/whatsapp.py"
+    }
   ]
 }
