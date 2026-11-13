@@ -675,6 +675,24 @@
           <h2 class="text-xs font-bold font-mono tracking-wider text-slate-200 uppercase">Telemetry Storage Vault</h2>
         </div>
 
+        <!-- 1-Tap Mobile Transfer Link -->
+        <div class="bg-slate-950 p-3 rounded-lg border border-cyan-500/30 space-y-2">
+          <div class="flex items-center justify-between">
+            <span class="text-[10px] font-bold text-cyan-300 uppercase flex items-center space-x-1.5 font-mono">
+              <i data-lucide="smartphone" class="w-3.5 h-3.5 text-cyan-400"></i>
+              <span>Transfer Setup to Mobile</span>
+            </span>
+            <span class="text-[9px] font-mono text-cyan-400/80 bg-cyan-950 px-1.5 py-0.5 rounded border border-cyan-500/20">1-Tap Link</span>
+          </div>
+          <p class="text-[10px] font-sans text-slate-400 leading-tight">
+            Copies a private pairing link with your API Key & Webhook URL. Send it to your phone (WhatsApp/iMessage/email) and tap it once to sync instantly.
+          </p>
+          <button type="button" id="copyMobilePairingBtn" class="w-full py-1.5 px-3 rounded bg-cyan-950 hover:bg-cyan-900/80 border border-cyan-500/40 text-cyan-300 text-xs font-mono font-semibold transition flex items-center justify-center space-x-1.5 shadow-glow-cyan-sm active:scale-95">
+            <i data-lucide="share-2" class="w-3.5 h-3.5"></i>
+            <span>Copy Mobile Setup Link</span>
+          </button>
+        </div>
+
         <div class="grid grid-cols-2 gap-2 text-xs font-mono">
           <button id="exportBackupBtn" class="py-2 px-3 rounded bg-slate-950 border border-slate-700 hover:border-slate-600 text-slate-200 flex items-center justify-center space-x-1.5 transition">
             <i data-lucide="download" class="w-3.5 h-3.5 text-cyan-400"></i>

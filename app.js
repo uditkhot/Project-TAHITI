@@ -1735,6 +1735,32 @@ Estimate realistic portion sizes and account for standard cooking oils. All macr
       }
     });
 
+    // 1-Tap Mobile Pairing Link
+    document.getElementById('copyMobilePairingBtn')?.addEventListener('click', async () => {
+      try {
+        const payload = {
+          geminiApiKey: state.settings.geminiApiKey || '',
+          geminiModel: state.settings.geminiModel || 'gemini-2.5-flash',
+          gasWebhookUrl: state.settings.gasWebhookUrl || '',
+          targets: state.settings.targets
+        };
+        const b64 = btoa(unescape(encodeURIComponent(JSON.stringify(payload))));
+        const pairingUrl = window.location.origin + window.location.pathname + '#setup=' + b64;
+        await navigator.clipboard.writeText(pairingUrl);
+        showToast('Mobile Setup Link Copied! Send it to your phone', 'share-2');
+      } catch (err) {
+        console.warn('Clipboard write failed:', err);
+        const payload = {
+          geminiApiKey: state.settings.geminiApiKey || '',
+          geminiModel: state.settings.geminiModel || 'gemini-2.5-flash',
+          gasWebhookUrl: state.settings.gasWebhookUrl || '',
+          targets: state.settings.targets
+        };
+        const b64 = btoa(unescape(encodeURIComponent(JSON.stringify(payload))));
+        prompt('Copy your Mobile Setup Link below:', window.location.origin + window.location.pathname + '#setup=' + b64);
+      }
+    });
+
     // Telemetry Storage Vault: Export & Import
     document.getElementById('exportBackupBtn')?.addEventListener('click', () => {
       const dataStr = 'data:text/json;charset=utf-8,' + encodeURIComponent(JSON.stringify(state, null, 2));
@@ -1802,9 +1828,31 @@ Estimate realistic portion sizes and account for standard cooking oils. All macr
     else if (tabParam === 'settings') switchTab('tabSettings');
   }
 
+  function checkUrlPairing() {
+    if (window.location.hash && window.location.hash.startsWith('#setup=')) {
+      try {
+        const rawB64 = window.location.hash.substring(7);
+        const jsonStr = decodeURIComponent(escape(atob(rawB64)));
+        const imported = JSON.parse(jsonStr);
+        if (imported && typeof imported === 'object') {
+          state.settings = {
+            ...state.settings,
+            ...imported
+          };
+          saveState();
+          showToast('JARVIS Setup Synchronized!', 'smartphone');
+          window.history.replaceState(null, null, window.location.pathname + window.location.search);
+        }
+      } catch (err) {
+        console.warn('[TAHITI] Setup hash pairing failed:', err);
+      }
+    }
+  }
+
   // --- BOOTSTRAP APPLICATION ---
   window.addEventListener('DOMContentLoaded', () => {
     loadState();
+    checkUrlPairing();
     setupEventListeners();
     refreshAllUI();
     console.log('[TAHITI] Project TAHITI v2.0 Initialized.');
