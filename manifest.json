@@ -1,0 +1,50 @@
+{
+  "name": "Project TAHITI v2.0 - Biometric & Telemetry HUD",
+  "short_name": "TAHITI",
+  "description": "Mobile-First Body Recomposition & Workout Telemetry Progressive Web App",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#020617",
+  "theme_color": "#0f172a",
+  "icons": [
+    {
+      "src": "./favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    },
+    {
+      "src": "./icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "./icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Clockwork Nutrition",
+      "short_name": "Nutrition",
+      "url": "./index.html?tab=nutrition",
+      "icons": [{ "src": "./icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Gym Overload Logger",
+      "short_name": "Gym",
+      "url": "./index.html?tab=gym",
+      "icons": [{ "src": "./icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Daily Biometrics",
+      "short_name": "Biometrics",
+      "url": "./index.html?tab=biometrics",
+      "icons": [{ "src": "./icon-192.png", "sizes": "192x192" }]
+    }
+  ]
+}
