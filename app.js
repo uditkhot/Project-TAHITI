@@ -32,50 +32,59 @@
     {
       id: 'p-2',
       time: '11:15 AM',
-      name: '1 Scoop Whey Isolate',
-      kcal: 120,
-      protein: 27,
-      carbs: 1,
-      fat: 0.5
+      name: '1 Scoop Whey Protein (Water/Milk)',
+      kcal: 130,
+      protein: 25,
+      carbs: 3,
+      fat: 2
     },
     {
       id: 'p-3',
       time: '01:30 PM',
-      name: "Cook's 2 Phulkas (no oil) + Bhaji + 150g Air-Fried Chicken + Chaas",
-      kcal: 550,
-      protein: 42,
-      carbs: 58,
-      fat: 14
+      name: "Cook's 2 Phulkas (no oil) + Bhaji + 150g Air-Fried Chicken",
+      kcal: 510,
+      protein: 40,
+      carbs: 54,
+      fat: 13
     },
     {
       id: 'p-4',
       time: '01:30 PM',
-      name: "Cook's 2 Phulkas + Bhaji + 100g Low-Fat Paneer + Chaas (Veg Alt)",
-      kcal: 540,
-      protein: 28,
-      carbs: 60,
-      fat: 20
+      name: "Cook's 2 Phulkas (no oil) + Bhaji + 100g Low-Fat Paneer",
+      kcal: 500,
+      protein: 26,
+      carbs: 56,
+      fat: 19
     },
     {
       id: 'p-5',
-      time: '08:30 PM',
-      name: "Rutuja's Chicken Wrap - 180g Chicken + Whole Wheat Roti + Hung Curd Dressing",
-      kcal: 560,
-      protein: 46,
-      carbs: 45,
-      fat: 18
+      time: '01:30 PM',
+      name: "Cook's 2 Phulkas (no oil) + Bhaji + 50g Soya Chunks",
+      kcal: 470,
+      protein: 34,
+      carbs: 68,
+      fat: 6
     },
     {
       id: 'p-6',
       time: '08:30 PM',
-      name: "Rutuja's 200g Tandoori/Grilled Chicken + Veggies",
+      name: "Rutuja's Chicken Wrap (180g Chicken + Whole Wheat Roti)",
+      kcal: 540,
+      protein: 46,
+      carbs: 45,
+      fat: 16
+    },
+    {
+      id: 'p-7',
+      time: '08:30 PM',
+      name: "Rutuja's 200g Tandoori/Grilled Chicken + Sautéed Veggies",
       kcal: 480,
       protein: 48,
       carbs: 18,
       fat: 20
     },
     {
-      id: 'p-7',
+      id: 'p-8',
       time: '08:30 PM',
       name: '150g Low-Fat Paneer Tikka/Bhurji + 1 Phulka',
       kcal: 540,
@@ -87,35 +96,36 @@
 
   const DEFAULT_EXERCISES = {
     upper: [
-      'Incline DB Press',
-      'Lat Pulldown / DB Row',
-      'Seated DB Shoulder Press',
-      'DB Lateral Raises',
-      'Cable Tricep Pushdown',
+      'Incline DB Press (30° Bench)',
+      'Wide-Grip Lat Pulldown (High Pulley)',
+      'Seated Chest Press (Vertical Neutral Grip)',
+      'Standing DB Shoulder Press',
+      'Standing DB Lateral Raises',
       'DB Bicep Curls',
-      'Weighted Cable/Bench Crunches'
+      'Overhead DB Tricep Extension',
+      'Decline Bench Crunches (Foot Rollers)'
     ],
     lower: [
+      'Seated Machine Leg Press',
+      'DB / Barbell Romanian Deadlifts',
       'DB Goblet Squats',
-      'DB Romanian Deadlifts',
-      'DB Walking Lunges',
-      'Standing Calf Raises',
-      'Hanging Knee / Lying Leg Raises (Pelvic Curl)',
-      'RKC Plank'
+      'Seated Leg Extension',
+      "Captain's Chair Knee Raises (Pelvic Curl)",
+      'RKC Floor Plank (Seconds)'
     ],
     full: [
-      'Incline DB Press',
-      'Lat Pulldown / DB Row',
-      'DB Goblet Squats',
-      'DB Romanian Deadlifts',
-      'DB Lateral Raises',
-      'RKC Plank'
+      'Incline DB Press (30° Bench)',
+      'Wide-Grip Lat Pulldown (High Pulley)',
+      'Seated Machine Leg Press',
+      'DB / Barbell Romanian Deadlifts',
+      'Standing DB Lateral Raises',
+      'Decline Bench Crunches (Foot Rollers)'
     ]
   };
 
   // --- GLOBAL STATE ---
   let state = {
-    version: 2,
+    version: 2.2,
     settings: {
       geminiApiKey: '',
       geminiModel: 'gemini-2.5-flash',
@@ -203,16 +213,38 @@
       if (raw) {
         const parsed = JSON.parse(raw);
         if (parsed && typeof parsed === 'object') {
+          const currentVersion = Number(parsed.version || 2);
+          let presets = parsed.settings?.presets;
+          let exercises = parsed.settings?.exercises;
+
+          // Detect if presets contain old curd/chaas/rice items or version < 2.2
+          const hasOldPresets = Array.isArray(presets) && presets.some(p => 
+            p.name && (p.name.includes('Chaas') || p.name.includes('Curd') || p.name.includes('Whey Isolate') || p.name.includes('Hung Curd'))
+          );
+
+          if (currentVersion < 2.2 || hasOldPresets) {
+            console.log('[TAHITI] Upgrading to v2.2 schema (Elina gym hardware & zero-curd presets)...');
+            // Preserve user-added custom presets (IDs that don't match old default IDs p-1..p-7)
+            const oldDefaultIds = new Set(['p-1', 'p-2', 'p-3', 'p-4', 'p-5', 'p-6', 'p-7']);
+            const customPresets = Array.isArray(presets) 
+              ? presets.filter(p => !oldDefaultIds.has(p.id) && !p.id.startsWith('p-')) 
+              : [];
+            
+            presets = [...JSON.parse(JSON.stringify(DEFAULT_PRESETS)), ...customPresets];
+            exercises = JSON.parse(JSON.stringify(DEFAULT_EXERCISES));
+          }
+
           // Merge settings
           state.settings = {
             ...state.settings,
             ...(parsed.settings || {}),
             targets: { ...DEFAULT_TARGETS, ...(parsed.settings?.targets || {}) },
-            presets: parsed.settings?.presets && parsed.settings.presets.length > 0 ? parsed.settings.presets : JSON.parse(JSON.stringify(DEFAULT_PRESETS)),
-            exercises: parsed.settings?.exercises || JSON.parse(JSON.stringify(DEFAULT_EXERCISES))
+            presets: presets && presets.length > 0 ? presets : JSON.parse(JSON.stringify(DEFAULT_PRESETS)),
+            exercises: exercises || JSON.parse(JSON.stringify(DEFAULT_EXERCISES))
           };
+          state.version = 2.2;
           state.days = parsed.days || {};
-          console.log('[TAHITI] State loaded successfully from localStorage');
+          console.log('[TAHITI] State loaded successfully from localStorage (v2.2)');
         }
       } else {
         // Try migrating from legacy prototype state if present
@@ -1467,6 +1499,38 @@ Estimate realistic portion sizes and account for standard cooking oils. All macr
       document.getElementById('manualMealModal').classList.add('hidden');
     });
 
+    // Inline Quick Macro Form Submit (Offline / Zero-API)
+    document.getElementById('quickMacroForm')?.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const name = document.getElementById('quickMacroName').value.trim();
+      const kcal = Number(document.getElementById('quickMacroKcal').value || 0);
+      const protein = Number(document.getElementById('quickMacroProtein').value || 0);
+      const carbs = Number(document.getElementById('quickMacroCarbs').value || 0);
+      const fat = Number(document.getElementById('quickMacroFat').value || 0);
+
+      if (!name) return;
+
+      const day = ensureDay(activeDate);
+      day.meals.push({
+        id: 'manual-' + Date.now(),
+        time: formatTimeNow(),
+        name: name,
+        kcal: kcal,
+        protein: protein,
+        carbs: carbs,
+        fat: fat,
+        source: 'manual'
+      });
+
+      saveState();
+      renderTopHUD();
+      renderLoggedMealsFeed();
+
+      // Reset form
+      document.getElementById('quickMacroForm').reset();
+      showToast(`Logged: ${name} (+${protein}g P)`, 'check-circle');
+    });
+
     // Manual Meal Form Submit
     document.getElementById('manualMealForm')?.addEventListener('submit', (e) => {
       e.preventDefault();
@@ -1686,7 +1750,7 @@ Estimate realistic portion sizes and account for standard cooking oils. All macr
     });
 
     document.getElementById('restoreDefaultPresetsBtn')?.addEventListener('click', () => {
-      if (confirm('Restore the 7 factory default nutrition presets?')) {
+      if (confirm('Restore the 8 factory default nutrition presets?')) {
         state.settings.presets = JSON.parse(JSON.stringify(DEFAULT_PRESETS));
         saveState();
         openPresetManager();

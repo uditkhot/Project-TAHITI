@@ -50,15 +50,19 @@
   - `Coke Zero Limit (Max 1 Can)` — Appetite discipline and sweetener audit
 - **Autosave Engine:** Every input and toggle immediately commits to local telemetry.
 
-### 3. Tab 2: Clockwork Nutrition (1-Tap Presets + AI Vision)
-- **1-Tap Macro Presets:**
-  - `[09:00 AM]` 3 Whole Eggs + 2 Whites + 1 Toast (340 kcal | 28g P | 15g C | 18g F)
-  - `[11:15 AM]` 1 Scoop Whey Isolate (120 kcal | 27g P | 1g C | 0.5g F)
-  - `[01:30 PM]` Cook's 2 Phulkas + Bhaji + 150g Air-Fried Chicken + Chaas (550 kcal | 42g P | 58g C | 14g F)
-  - `[01:30 PM - Veg Alt]` Cook's 2 Phulkas + Bhaji + 100g Low-Fat Paneer + Chaas (540 kcal | 28g P | 60g C | 20g F)
-  - `[08:30 PM]` Rutuja's Chicken Wrap - 180g Chicken + Roti + Hung Curd (560 kcal | 46g P | 45g C | 18g F)
-  - `[08:30 PM]` Rutuja's 200g Tandoori/Grilled Chicken + Veggies (480 kcal | 48g P | 18g C | 20g F)
-  - `[08:30 PM]` 150g Low-Fat Paneer Tikka/Bhurji + 1 Phulka (540 kcal | 36g P | 38g C | 24g F)
+### 3. Tab 2: Clockwork Nutrition (1-Tap Presets + Quick Entry + AI Vision)
+- **1-Tap Macro Presets (Zero Curd/Yogurt, Zero Rice):**
+  - `[09:00 AM]` 3 Whole Eggs + 2 Whites + 1 Toast — `340 kcal | 28g P | 15g C | 18g F`
+  - `[11:15 AM]` 1 Scoop Whey Protein (Water/Milk) — `130 kcal | 25g P | 3g C | 2g F`
+  - `[01:30 PM]` Cook's 2 Phulkas (no oil) + Bhaji + 150g Air-Fried Chicken — `510 kcal | 40g P | 54g C | 13g F`
+  - `[01:30 PM - Veg]` Cook's 2 Phulkas (no oil) + Bhaji + 100g Low-Fat Paneer — `500 kcal | 26g P | 56g C | 19g F`
+  - `[01:30 PM - Veg 2]` Cook's 2 Phulkas (no oil) + Bhaji + 50g Soya Chunks — `470 kcal | 34g P | 68g C | 6g F`
+  - `[08:30 PM]` Rutuja's Chicken Wrap (180g Chicken + Whole Wheat Roti) — `540 kcal | 46g P | 45g C | 16g F`
+  - `[08:30 PM]` Rutuja's 200g Tandoori/Grilled Chicken + Sautéed Veggies — `480 kcal | 48g P | 18g C | 20g F`
+  - `[08:30 PM]` 150g Low-Fat Paneer Tikka/Bhurji + 1 Phulka — `540 kcal | 36g P | 38g C | 24g F`
+- **Quick-Add Macro Logger (Zero API / Offline):**
+  - Instant inline manual entry row for Meal Name, Calories, Protein, Carbs, Fat.
+  - Log custom meals (like veggie-avocado-cheese sandwiches) offline with zero API consumption.
 - **JARVIS Multimodal Meal Analyzer:**
   - Camera snapshot or gallery image upload.
   - Text description input for off-menu items.
@@ -67,10 +71,10 @@
 - **Logged Meals Feed:** Chronological list for the active date with individual macro pills and 1-tap delete button.
 
 ### 4. Tab 3: 10:15 AM Gym Logger (Progressive Overload)
-- **Split Selectors:**
-  - `Upper Body` (Incline DB Press, Lat Pulldown / DB Row, Seated DB Shoulder Press, DB Lateral Raises, Cable Tricep Pushdown, DB Bicep Curls, Weighted Cable/Bench Crunches)
-  - `Lower & Core` (DB Goblet Squats, DB Romanian Deadlifts, DB Walking Lunges, Standing Calf Raises, Hanging Knee / Lying Leg Raises, RKC Plank)
-  - `MED Failsafe` (Incline DB Press, Lat Pulldown / DB Row, DB Goblet Squats, DB Romanian Deadlifts, DB Lateral Raises, RKC Plank)
+- **Split Selectors (Matched to Elina Society Gym Hardware):**
+  - `Upper Body`: Incline DB Press (30° Bench), Wide-Grip Lat Pulldown (High Pulley), Seated Chest Press (Vertical Neutral Grip), Standing DB Shoulder Press, Standing DB Lateral Raises, DB Bicep Curls, Overhead DB Tricep Extension, Decline Bench Crunches (Foot Rollers)
+  - `Lower & Core`: Seated Machine Leg Press, DB / Barbell Romanian Deadlifts, DB Goblet Squats, Seated Leg Extension, Captain's Chair Knee Raises (Pelvic Curl), RKC Floor Plank (Seconds)
+  - `MED Failsafe`: Incline DB Press (30° Bench), Wide-Grip Lat Pulldown (High Pulley), Seated Machine Leg Press, DB / Barbell Romanian Deadlifts, Standing DB Lateral Raises, Decline Bench Crunches (Foot Rollers)
 - **Top Set History Engine:**
   - Scans historical session data across all previous dates.
   - Displays a tactical badge above each movement: `⚡ Last Session Top Set: 26 kg × 8 reps`.
