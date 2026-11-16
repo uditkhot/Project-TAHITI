@@ -260,11 +260,34 @@
     ensureDay(activeDate);
   }
 
-  function saveState() {
+  let isSyncingInProgress = false;
+
+  function setSyncLoading(isLoading, badgeText = 'SYNCING') {
+    isSyncingInProgress = isLoading;
+    const syncStatusBadge = document.getElementById('syncStatusBadge');
+    const syncIcon = document.getElementById('syncIcon');
+
+    if (isLoading && syncStatusBadge && badgeText) {
+      syncStatusBadge.textContent = badgeText;
+    }
+    if (syncIcon) {
+      if (isLoading) {
+        syncIcon.classList.add('animate-spin');
+      } else {
+        syncIcon.classList.remove('animate-spin');
+      }
+    }
+  }
+
+  function saveState(markSynced = false) {
     try {
       if (state.days[activeDate]) {
         state.days[activeDate].lastModified = new Date().toISOString();
-        state.days[activeDate].synced = false;
+        if (markSynced === true) {
+          state.days[activeDate].synced = true;
+        } else if (markSynced === false) {
+          state.days[activeDate].synced = false;
+        }
       }
       localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
       updateSyncStatusUI();
@@ -341,6 +364,12 @@
     const syncIcon = document.getElementById('syncIcon');
     const headerStatusText = document.getElementById('headerStatusText');
     const webhookStatusIndicator = document.getElementById('webhookStatusIndicator');
+
+    if (!isSyncingInProgress && syncIcon) {
+      syncIcon.classList.remove('animate-spin');
+    }
+
+    if (isSyncingInProgress) return;
 
     if (!state.settings.gasWebhookUrl) {
       if (syncStatusBadge) syncStatusBadge.textContent = 'LOCAL';
@@ -461,10 +490,16 @@
     let totalTonnage = 0;
     const exercises = currentDay.workouts.exercises || {};
     for (const ex in exercises) {
-      if (Array.isArray(exercises[ex])) {
-        exercises[ex].forEach(s => {
+      const data = exercises[ex];
+      if (Array.isArray(data)) {
+        data.forEach(s => {
           if (s.weight && s.reps) totalTonnage += Number(s.weight) * Number(s.reps);
         });
+      } else if (typeof data === 'object' && data !== null) {
+        const w = Number(data.weight || 0);
+        const r = Number(data.reps || 0);
+        const s = Number(data.sets || 3);
+        if (w > 0 && r > 0 && s > 0) totalTonnage += (w * r * s);
       }
     }
 
@@ -789,23 +824,23 @@
     plannedList.forEach((exName) => {
       const topSetInfo = getHistoricalTopSet(exName, activeDate);
 
-      if (!day.workouts.exercises[exName]) {
-        day.workouts.exercises[exName] = [
-          { set: 1, weight: '', reps: '', completed: false },
-          { set: 2, weight: '', reps: '', completed: false },
-          { set: 3, weight: '', reps: '', completed: false }
-        ];
+      // Normalize exercise data to 3-box format: { weight, reps, sets }
+      if (!day.workouts.exercises[exName] || Array.isArray(day.workouts.exercises[exName])) {
+        const legacyArr = Array.isArray(day.workouts.exercises[exName]) ? day.workouts.exercises[exName] : [];
+        const first = legacyArr[0] || {};
+        day.workouts.exercises[exName] = {
+          weight: first.weight !== undefined ? first.weight : '',
+          reps: first.reps !== undefined ? first.reps : '',
+          sets: legacyArr.length > 0 ? legacyArr.length : 3
+        };
       }
 
-      const sets = day.workouts.exercises[exName];
-      let exVolume = 0;
-      sets.forEach((s) => {
-        if (s.weight && s.reps) {
-          const v = Number(s.weight) * Number(s.reps);
-          exVolume += v;
-          totalTonnage += v;
-        }
-      });
+      const exData = day.workouts.exercises[exName];
+      const wVal = Number(exData.weight || 0);
+      const rVal = Number(exData.reps || 0);
+      const sVal = Number(exData.sets || 3);
+      const exVolume = (wVal > 0 && rVal > 0 && sVal > 0) ? (wVal * rVal * sVal) : 0;
+      totalTonnage += exVolume;
 
       const card = document.createElement('div');
       card.className = 'bg-slate-900/80 border border-slate-800 rounded-xl p-3.5 space-y-2.5';
@@ -813,7 +848,7 @@
       const topSetBadge = topSetInfo
         ? `<span class="text-[10px] font-mono px-2 py-0.5 rounded bg-cyan-950/80 text-cyan-300 border border-cyan-500/30 flex items-center space-x-1">
              <i data-lucide="zap" class="w-3 h-3 text-cyan-400"></i>
-             <span>Last Top: <strong>${topSetInfo.weight}kg &times; ${topSetInfo.reps}</strong></span>
+             <span>Last: <strong>${topSetInfo.weight}kg &times; ${topSetInfo.reps} reps (${topSetInfo.sets} sets)</strong></span>
            </span>`
         : `<span class="text-[10px] font-mono px-2 py-0.5 rounded bg-slate-950 text-slate-500 border border-slate-800">
              Baseline / New
@@ -832,101 +867,56 @@
 
         <div class="flex items-center justify-between">
           ${topSetBadge}
-          <button type="button" class="add-set-btn text-[10px] font-mono text-cyan-400 hover:text-cyan-300 flex items-center space-x-1" data-ex="${escapeHtml(exName)}">
-            <i data-lucide="plus" class="w-3 h-3"></i>
-            <span>Add Set</span>
-          </button>
         </div>
 
-        <!-- Sets Table -->
-        <div class="space-y-1.5 pt-1">
-          <div class="grid grid-cols-12 gap-1.5 text-[9px] font-mono text-slate-500 uppercase px-1">
-            <div class="col-span-2">Set</div>
-            <div class="col-span-4">Weight (kg)</div>
-            <div class="col-span-4">Reps</div>
-            <div class="col-span-2 text-center">Done</div>
+        <!-- 3-Box Single-Line Input Row: Weight | Reps | Sets -->
+        <div class="grid grid-cols-3 gap-2 bg-slate-950/70 p-2 rounded-lg border border-slate-800">
+          <div>
+            <label class="block text-[9px] font-mono text-slate-400 uppercase text-center mb-0.5">Weight (kg)</label>
+            <input type="number" step="0.5" class="ex-weight-input w-full bg-slate-900 border border-slate-700/80 focus:border-cyan-400 rounded px-2 py-1.5 text-xs font-mono text-cyan-300 text-center font-bold focus:outline-none transition"
+              placeholder="kg" value="${exData.weight !== '' ? exData.weight : ''}">
           </div>
-          <div class="sets-rows-container space-y-1.5" data-ex="${escapeHtml(exName)}">
-            <!-- Set rows inserted here -->
+          <div>
+            <label class="block text-[9px] font-mono text-slate-400 uppercase text-center mb-0.5">Reps / Set</label>
+            <input type="number" step="1" class="ex-reps-input w-full bg-slate-900 border border-slate-700/80 focus:border-cyan-400 rounded px-2 py-1.5 text-xs font-mono text-cyan-300 text-center font-bold focus:outline-none transition"
+              placeholder="reps" value="${exData.reps !== '' ? exData.reps : ''}">
+          </div>
+          <div>
+            <label class="block text-[9px] font-mono text-slate-400 uppercase text-center mb-0.5">Total Sets</label>
+            <input type="number" step="1" min="1" class="ex-sets-input w-full bg-slate-900 border border-slate-700/80 focus:border-cyan-400 rounded px-2 py-1.5 text-xs font-mono text-cyan-300 text-center font-bold focus:outline-none transition"
+              placeholder="3" value="${exData.sets !== '' ? exData.sets : 3}">
           </div>
         </div>
 
         <!-- Finish Exercise Action Button -->
-        <button type="button" class="finish-movement-btn w-full mt-2 py-1.5 rounded-lg bg-emerald-950/70 hover:bg-emerald-900 border border-emerald-500/40 text-emerald-300 font-mono font-semibold text-xs uppercase flex items-center justify-center space-x-1.5 transition active:scale-95 shadow-glow-emerald" data-ex="${escapeHtml(exName)}">
+        <button type="button" class="finish-movement-btn w-full mt-1 py-1.5 rounded-lg bg-emerald-950/70 hover:bg-emerald-900 border border-emerald-500/40 text-emerald-300 font-mono font-semibold text-xs uppercase flex items-center justify-center space-x-1.5 transition active:scale-95 shadow-glow-emerald" data-ex="${escapeHtml(exName)}">
           <i data-lucide="check-check" class="w-3.5 h-3.5 text-emerald-400"></i>
           <span>Finish Movement</span>
         </button>
       `;
 
-      // Render Set Rows
-      const rowsContainer = card.querySelector('.sets-rows-container');
-      sets.forEach((setObj, sIdx) => {
-        const row = document.createElement('div');
-        row.className = 'grid grid-cols-12 gap-1.5 items-center bg-slate-950/60 p-1.5 rounded-lg border border-slate-800/80';
-        
-        row.innerHTML = `
-          <div class="col-span-2 text-xs font-mono font-bold text-slate-400 text-center">#${sIdx + 1}</div>
-          <div class="col-span-4">
-            <input type="number" step="0.5" class="set-weight-input w-full bg-slate-900 border border-slate-700/80 focus:border-cyan-400 rounded px-1.5 py-1 text-xs font-mono text-cyan-300 text-center focus:outline-none"
-              placeholder="kg" value="${setObj.weight !== '' ? setObj.weight : ''}">
-          </div>
-          <div class="col-span-4">
-            <input type="number" step="1" class="set-reps-input w-full bg-slate-900 border border-slate-700/80 focus:border-cyan-400 rounded px-1.5 py-1 text-xs font-mono text-cyan-300 text-center focus:outline-none"
-              placeholder="reps" value="${setObj.reps !== '' ? setObj.reps : ''}">
-          </div>
-          <div class="col-span-2 flex items-center justify-center space-x-1">
-            <button type="button" class="toggle-set-done p-1 rounded ${setObj.completed ? 'bg-emerald-950 text-emerald-400 border border-emerald-500/40 shadow-glow-emerald' : 'bg-slate-900 text-slate-600 border border-slate-800'}" title="Toggle set complete">
-              <i data-lucide="check" class="w-3.5 h-3.5"></i>
-            </button>
-            <button type="button" class="remove-set-btn p-1 rounded text-slate-600 hover:text-rose-400" title="Remove set">
-              <i data-lucide="x" class="w-3 h-3"></i>
-            </button>
-          </div>
-        `;
+      const weightInput = card.querySelector('.ex-weight-input');
+      const repsInput = card.querySelector('.ex-reps-input');
+      const setsInput = card.querySelector('.ex-sets-input');
 
-        const weightInput = row.querySelector('.set-weight-input');
-        const repsInput = row.querySelector('.set-reps-input');
-        const doneBtn = row.querySelector('.toggle-set-done');
-        const removeBtn = row.querySelector('.remove-set-btn');
-
-        weightInput.addEventListener('input', (e) => {
-          setObj.weight = e.target.value;
-          saveState();
-          updateTonnageBadge();
-        });
-
-        repsInput.addEventListener('input', (e) => {
-          setObj.reps = e.target.value;
-          saveState();
-          updateTonnageBadge();
-        });
-
-        doneBtn.addEventListener('click', () => {
-          setObj.completed = !setObj.completed;
-          saveState();
-          renderTabGym();
-        });
-
-        removeBtn.addEventListener('click', () => {
-          sets.splice(sIdx, 1);
-          saveState();
-          renderTabGym();
-        });
-
-        rowsContainer.appendChild(row);
-      });
-
-      // Add Set Button
-      card.querySelector('.add-set-btn').addEventListener('click', () => {
-        const lastSet = sets[sets.length - 1];
-        const newWeight = lastSet ? lastSet.weight : '';
-        const newReps = lastSet ? lastSet.reps : '';
-        sets.push({ set: sets.length + 1, weight: newWeight, reps: newReps, completed: false });
+      weightInput.addEventListener('input', (e) => {
+        exData.weight = e.target.value;
         saveState();
-        renderTabGym();
+        updateTonnageBadge();
       });
 
-      // Finish Movement Button
+      repsInput.addEventListener('input', (e) => {
+        exData.reps = e.target.value;
+        saveState();
+        updateTonnageBadge();
+      });
+
+      setsInput.addEventListener('input', (e) => {
+        exData.sets = Number(e.target.value || 3);
+        saveState();
+        updateTonnageBadge();
+      });
+
       card.querySelector('.finish-movement-btn').addEventListener('click', () => {
         finishExercise(exName);
       });
@@ -936,32 +926,24 @@
 
     // --- RENDER COMPLETED EXERCISES ---
     completedList.forEach((exName) => {
-      const sets = day.workouts.exercises[exName] || [];
-      let exVolume = 0;
-      let topWeight = 0;
-      let topReps = 0;
-      let validSetsCount = 0;
+      const exData = day.workouts.exercises[exName] || { weight: '', reps: '', sets: 3 };
+      let w = 0;
+      let r = 0;
+      let s = 3;
 
-      const chips = [];
-      sets.forEach((s) => {
-        if (s.weight && s.reps) {
-          validSetsCount++;
-          const w = Number(s.weight);
-          const r = Number(s.reps);
-          const v = w * r;
-          exVolume += v;
-          totalTonnage += v;
+      if (Array.isArray(exData)) {
+        const first = exData[0] || {};
+        w = Number(first.weight || 0);
+        r = Number(first.reps || 0);
+        s = exData.length || 3;
+      } else {
+        w = Number(exData.weight || 0);
+        r = Number(exData.reps || 0);
+        s = Number(exData.sets || 3);
+      }
 
-          if (w > topWeight || (w === topWeight && r > topReps)) {
-            topWeight = w;
-            topReps = r;
-          }
-
-          chips.push(`<span class="text-[10px] font-mono px-2 py-0.5 rounded bg-slate-950 border border-slate-800 text-slate-300">
-            S${s.set}: <strong class="text-cyan-300">${s.weight}kg</strong> &times; ${s.reps}
-          </span>`);
-        }
-      });
+      const exVolume = (w > 0 && r > 0 && s > 0) ? (w * r * s) : 0;
+      totalTonnage += exVolume;
 
       const card = document.createElement('div');
       card.className = 'bg-gradient-to-r from-slate-900/90 via-slate-900 to-emerald-950/20 border border-emerald-500/30 rounded-xl p-3 space-y-2';
@@ -972,17 +954,15 @@
             <i data-lucide="check-circle-2" class="w-4 h-4 text-emerald-400"></i>
             <h4 class="text-xs font-bold font-mono text-emerald-300">${escapeHtml(exName)}</h4>
           </div>
-          <button type="button" class="reopen-movement-btn px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-[10px] font-mono text-cyan-300 border border-slate-700 flex items-center space-x-1 transition active:scale-95" data-ex="${escapeHtml(exName)}" title="Reopen this movement to edit sets">
+          <button type="button" class="reopen-movement-btn px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-[10px] font-mono text-cyan-300 border border-slate-700 flex items-center space-x-1 transition active:scale-95" data-ex="${escapeHtml(exName)}" title="Reopen this movement to edit">
             <i data-lucide="rotate-ccw" class="w-3 h-3"></i>
             <span>Reopen</span>
           </button>
         </div>
-        <div class="flex items-center justify-between text-[10px] font-mono text-slate-400 border-t border-slate-800/80 pt-1.5">
-          <span>Top: <strong class="text-emerald-300">${topWeight > 0 ? `${topWeight}kg &times; ${topReps}` : 'Logged'}</strong></span>
-          <span>Vol: <strong class="text-cyan-300">${exVolume.toLocaleString()} kg</strong></span>
-          <span class="text-slate-500">${validSetsCount} sets</span>
+        <div class="flex items-center justify-between text-[11px] font-mono border-t border-slate-800/80 pt-1.5">
+          <span class="text-emerald-300 font-bold">${w > 0 ? `${w}kg &times; ${r} reps (${s} sets)` : 'Completed'}</span>
+          <span class="text-cyan-300 font-semibold">${exVolume.toLocaleString()} kg Vol</span>
         </div>
-        ${chips.length > 0 ? `<div class="flex flex-wrap gap-1 pt-0.5">${chips.join('')}</div>` : ''}
       `;
 
       card.querySelector('.reopen-movement-btn').addEventListener('click', () => {
@@ -1023,24 +1003,6 @@
   function finishExercise(exName) {
     const day = ensureDay(activeDate);
     day.workouts.finishedExercises = day.workouts.finishedExercises || [];
-    const sets = day.workouts.exercises[exName] || [];
-
-    // Mark any entered sets as completed
-    let hasData = false;
-    sets.forEach((s) => {
-      if (s.weight && s.reps) {
-        s.completed = true;
-        hasData = true;
-      }
-    });
-
-    if (!hasData) {
-      // Auto fill a baseline placeholder set if none entered
-      if (sets.length > 0 && (!sets[0].weight || !sets[0].reps)) {
-        sets[0].completed = true;
-      }
-    }
-
     if (!day.workouts.finishedExercises.includes(exName)) {
       day.workouts.finishedExercises.push(exName);
     }
@@ -1064,12 +1026,16 @@
     let totalTonnage = 0;
     const exercises = day.workouts.exercises || {};
     for (const ex in exercises) {
-      if (Array.isArray(exercises[ex])) {
-        exercises[ex].forEach((s) => {
-          if (s.weight && s.reps) {
-            totalTonnage += Number(s.weight) * Number(s.reps);
-          }
+      const data = exercises[ex];
+      if (Array.isArray(data)) {
+        data.forEach((s) => {
+          if (s.weight && s.reps) totalTonnage += Number(s.weight) * Number(s.reps);
         });
+      } else if (typeof data === 'object' && data !== null) {
+        const w = Number(data.weight || 0);
+        const r = Number(data.reps || 0);
+        const s = Number(data.sets || 3);
+        if (w > 0 && r > 0 && s > 0) totalTonnage += (w * r * s);
       }
     }
     const tonnageBadge = document.getElementById('gymTonnageBadge');
@@ -1083,6 +1049,7 @@
   function getHistoricalTopSet(exerciseName, excludeDate) {
     let topWeight = -1;
     let topReps = -1;
+    let topSets = -1;
     let topDate = null;
 
     const dates = Object.keys(state.days).sort();
@@ -1090,23 +1057,34 @@
       if (d === excludeDate) continue;
       const dayData = state.days[d];
       if (dayData?.workouts?.exercises && dayData.workouts.exercises[exerciseName]) {
-        const sets = dayData.workouts.exercises[exerciseName];
-        if (Array.isArray(sets)) {
-          sets.forEach((s) => {
+        const exData = dayData.workouts.exercises[exerciseName];
+        if (Array.isArray(exData)) {
+          exData.forEach((s) => {
             const w = Number(s.weight || 0);
             const r = Number(s.reps || 0);
             if (w > topWeight || (w === topWeight && r > topReps)) {
               topWeight = w;
               topReps = r;
+              topSets = exData.length;
               topDate = d;
             }
           });
+        } else if (typeof exData === 'object' && exData !== null) {
+          const w = Number(exData.weight || 0);
+          const r = Number(exData.reps || 0);
+          const s = Number(exData.sets || 3);
+          if (w > topWeight || (w === topWeight && r > topReps)) {
+            topWeight = w;
+            topReps = r;
+            topSets = s;
+            topDate = d;
+          }
         }
       }
     }
 
     if (topWeight > 0) {
-      return { weight: topWeight, reps: topReps, date: topDate };
+      return { weight: topWeight, reps: topReps, sets: topSets, date: topDate };
     }
     return null;
   }
@@ -1524,13 +1502,10 @@ Return ONLY a strict JSON object (no markdown, no backticks, no comments) matchi
       return;
     }
 
-    const syncStatusBadge = document.getElementById('syncStatusBadge');
-    const syncIcon = document.getElementById('syncIcon');
-    if (syncStatusBadge) syncStatusBadge.textContent = 'PULLING';
-    if (syncIcon) syncIcon.classList.add('animate-spin');
+    setSyncLoading(true, 'PULLING');
 
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 12000);
+    const timeoutId = setTimeout(() => controller.abort(), 10000);
 
     try {
       const url = webhookUrl.includes('?') ? `${webhookUrl}&action=fetchAll` : `${webhookUrl}?action=fetchAll`;
@@ -1546,11 +1521,9 @@ Return ONLY a strict JSON object (no markdown, no backticks, no comments) matchi
 
       const res = await response.json();
       if (res.status === 'success' && res.days && typeof res.days === 'object') {
-        let pulledCount = 0;
         for (const [d, cloudDay] of Object.entries(res.days)) {
           if (!state.days[d]) {
             state.days[d] = cloudDay;
-            pulledCount++;
           } else {
             const localDay = state.days[d];
             if (cloudDay.biometrics) {
@@ -1579,8 +1552,17 @@ Return ONLY a strict JSON object (no markdown, no backticks, no comments) matchi
               for (const sKey in cloudDay.workouts.splits) {
                 const cloudExMap = cloudDay.workouts.splits[sKey];
                 for (const exName in cloudExMap) {
-                  if (!localDay.workouts.exercises[exName] || localDay.workouts.exercises[exName].length === 0) {
-                    localDay.workouts.exercises[exName] = cloudExMap[exName];
+                  if (!localDay.workouts.exercises[exName]) {
+                    const cVal = cloudExMap[exName];
+                    if (Array.isArray(cVal)) {
+                      localDay.workouts.exercises[exName] = {
+                        weight: cVal[0]?.weight || '',
+                        reps: cVal[0]?.reps || '',
+                        sets: cVal.length || 3
+                      };
+                    } else {
+                      localDay.workouts.exercises[exName] = cVal;
+                    }
                   }
                   if (!localDay.workouts.finishedExercises.includes(exName)) {
                     localDay.workouts.finishedExercises.push(exName);
@@ -1591,7 +1573,8 @@ Return ONLY a strict JSON object (no markdown, no backticks, no comments) matchi
             localDay.synced = true;
           }
         }
-        saveState();
+        ensureDay(activeDate).synced = true;
+        saveState(true);
         refreshAllUI();
         if (!silent) {
           showToast(`Cloud Pull Complete: Synced ${Object.keys(res.days).length} days`, 'cloud-lightning');
@@ -1606,7 +1589,7 @@ Return ONLY a strict JSON object (no markdown, no backticks, no comments) matchi
       }
     } finally {
       clearTimeout(timeoutId);
-      if (syncIcon) syncIcon.classList.remove('animate-spin');
+      setSyncLoading(false);
       updateSyncStatusUI();
     }
   }
@@ -1619,17 +1602,35 @@ Return ONLY a strict JSON object (no markdown, no backticks, no comments) matchi
       return;
     }
 
-    const syncStatusBadge = document.getElementById('syncStatusBadge');
-    const syncIcon = document.getElementById('syncIcon');
-    if (syncStatusBadge) syncStatusBadge.textContent = 'SYNCING';
-    if (syncIcon) syncIcon.classList.add('animate-spin');
+    setSyncLoading(true, 'SYNCING');
+
+    // Build payload mapping single-line 3-box format to set arrays for backend compatibility
+    const currentDayData = JSON.parse(JSON.stringify(ensureDay(activeDate)));
+    if (currentDayData.workouts && currentDayData.workouts.exercises) {
+      for (const exName in currentDayData.workouts.exercises) {
+        const item = currentDayData.workouts.exercises[exName];
+        if (typeof item === 'object' && !Array.isArray(item)) {
+          const setsArr = [];
+          const sCount = Number(item.sets || 3);
+          for (let s = 1; s <= sCount; s++) {
+            setsArr.push({
+              set: s,
+              weight: item.weight || '',
+              reps: item.reps || '',
+              completed: true
+            });
+          }
+          currentDayData.workouts.exercises[exName] = setsArr;
+        }
+      }
+    }
 
     const payload = syncBulk
       ? { action: 'syncBulk', days: state.days }
-      : { action: 'syncDay', date: activeDate, dayData: ensureDay(activeDate) };
+      : { action: 'syncDay', date: activeDate, dayData: currentDayData };
 
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 12000);
+    const timeoutId = setTimeout(() => controller.abort(), 10000);
 
     try {
       const response = await fetch(webhookUrl, {
@@ -1649,23 +1650,18 @@ Return ONLY a strict JSON object (no markdown, no backticks, no comments) matchi
       } else {
         ensureDay(activeDate).synced = true;
       }
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-      updateSyncStatusUI();
+      saveState(true);
 
       showToast(syncBulk ? 'All Telemetry Synced to Google Sheets' : "Today's Telemetry Synced to Cloud", 'cloud');
-
-      // After successful push, perform a silent pull to ensure parity
-      pullFromGoogleSheets(true);
 
     } catch (err) {
       console.warn('[TAHITI] Cloud sync failed or CORS restricted:', err);
       ensureDay(activeDate).synced = true;
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-      updateSyncStatusUI();
+      saveState(true);
       showToast('Sync request dispatched to Google Sheets', 'cloud');
     } finally {
       clearTimeout(timeoutId);
-      if (syncIcon) syncIcon.classList.remove('animate-spin');
+      setSyncLoading(false);
       updateSyncStatusUI();
     }
   }
