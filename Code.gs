@@ -1,23 +1,12 @@
 /**
  * ============================================================================
- * PROJECT TAHITI (v2.0) — TELEMETRY & BODY RECOMPOSITION WEBHOOK
+ * PROJECT TAHITI (v2.3) — TELEMETRY & BODY RECOMPOSITION WEBHOOK
  * Google Apps Script Backend (Code.gs)
  * ============================================================================
  * 
- * DEPLOYMENT INSTRUCTIONS:
- * 1. Open Google Sheets (create a new blank spreadsheet, e.g. "TAHITI Telemetry Matrix").
- * 2. In the menu, go to: Extensions > Apps Script.
- * 3. Delete any default code in Code.gs and paste this entire script.
- * 4. Click the Save icon (💾).
- * 5. Click "Deploy" (top right) > "New deployment".
- * 6. Under "Select type", choose "Web app".
- * 7. Set:
- *    - Description: TAHITI v2.0 Webhook
- *    - Execute as: "Me" (your Google account)
- *    - Who has access: "Anyone" (allows PWA fetch without complex OAuth)
- * 8. Click "Deploy", authorize permissions when prompted.
- * 9. Copy the "Web app URL" (starts with https://script.google.com/macros/s/...)
- * 10. Paste this URL into Project TAHITI PWA > Tab 4 (Settings) > Webhook URL.
+ * Supports two-way cloud synchronization:
+ * - POST: Commits telemetry (single-day or bulk) into Google Sheets
+ * - GET: Pulls telemetry (fetchAll or fetchDay) down to PWA clients
  * ============================================================================
  */
 
@@ -30,20 +19,30 @@ var SHEETS = {
 };
 
 /**
- * Handle HTTP GET Requests (Health Check & Telemetry Pull)
+ * Handle HTTP GET Requests (Health Check & Two-Way Telemetry Pull)
  */
 function doGet(e) {
   try {
     var ss = SpreadsheetApp.getActiveSpreadsheet();
+    ensureSheetsAndHeaders(ss);
     var action = (e && e.parameter && e.parameter.action) ? e.parameter.action : "ping";
     
     if (action === "ping") {
       return createJsonResponse({
         status: "success",
         code: 200,
-        message: "Project TAHITI v2.0 Webhook Operational",
+        message: "Project TAHITI v2.3 Webhook Operational",
         spreadsheetName: ss.getName(),
         spreadsheetId: ss.getId(),
+        timestamp: new Date().toISOString()
+      });
+    }
+
+    if (action === "fetchAll") {
+      var allDays = readAllDays(ss);
+      return createJsonResponse({
+        status: "success",
+        days: allDays,
         timestamp: new Date().toISOString()
       });
     }
@@ -59,7 +58,7 @@ function doGet(e) {
 
     return createJsonResponse({
       status: "success",
-      message: "TAHITI Webhook Ready. Use POST for telemetry sync."
+      message: "TAHITI Webhook Ready. Use GET ?action=fetchAll to pull or POST to sync."
     });
   } catch (error) {
     return createJsonResponse({ status: "error", message: error.toString() });
@@ -127,7 +126,7 @@ function doPost(e) {
 }
 
 /**
- * Synchronize a single day's record across all 4 sheets
+ * Synchronize a single day's record across all sheets
  */
 function syncSingleDay(ss, dateStr, day) {
   var now = new Date();
@@ -176,8 +175,6 @@ function syncBiometrics(ss, dateStr, bio, habits, timestamp) {
     bio.waistRelaxed !== null && bio.waistRelaxed !== undefined ? bio.waistRelaxed : "",
     bio.steps || 0,
     habits.vacuums ? "YES" : "NO",
-    habits.cookOil ? "YES" : "NO",
-    habits.cokeZero ? "YES" : "NO",
     timestamp
   ];
 
@@ -195,7 +192,7 @@ function syncNutrition(ss, dateStr, meals, timestamp) {
   var sheet = ss.getSheetByName(SHEETS.NUTRITION);
   var data = sheet.getDataRange().getValues();
 
-  // Delete existing rows for this date to avoid duplicate records upon multiple syncs
+  // Delete existing rows for this date to avoid duplicates
   for (var i = data.length - 1; i >= 1; i--) {
     if (normalizeDateString(data[i][0]) === dateStr) {
       sheet.deleteRow(i + 1);
@@ -242,7 +239,7 @@ function syncWorkouts(ss, dateStr, workouts, timestamp) {
   }
 
   var exercises = workouts.exercises || {};
-  var activeSplit = workouts.activeSplit || "Default Split";
+  var activeSplit = workouts.activeSplit || "Upper Body";
   var newRows = [];
 
   for (var exName in exercises) {
@@ -321,11 +318,6 @@ function syncSummary(ss, dateStr, day, timestamp) {
     }
   }
 
-  var habitsCompleted = 0;
-  if (habits.vacuums) habitsCompleted++;
-  if (habits.cookOil) habitsCompleted++;
-  if (habits.cokeZero) habitsCompleted++;
-
   var rowValues = [
     dateStr,
     bio.weight || "",
@@ -335,7 +327,7 @@ function syncSummary(ss, dateStr, day, timestamp) {
     Math.round(totalFat * 10) / 10,
     bio.steps || 0,
     totalTonnage,
-    habitsCompleted + "/3",
+    habits.vacuums ? "YES" : "NO",
     timestamp
   ];
 
@@ -347,13 +339,182 @@ function syncSummary(ss, dateStr, day, timestamp) {
 }
 
 /**
+ * Read a single date's complete record from Google Sheets
+ */
+function readDayData(ss, dateStr) {
+  var day = {
+    biometrics: { weight: null, subcutaneousFat: null, waistBraced: null, waistRelaxed: null, steps: 0 },
+    habits: { vacuums: false },
+    meals: [],
+    workouts: { activeSplit: "upper", exercises: {} },
+    synced: true
+  };
+
+  // 1. Biometrics
+  var bioSheet = ss.getSheetByName(SHEETS.BIOMETRICS);
+  if (bioSheet && bioSheet.getLastRow() > 1) {
+    var bioData = bioSheet.getDataRange().getValues();
+    for (var i = 1; i < bioData.length; i++) {
+      if (normalizeDateString(bioData[i][0]) === dateStr) {
+        day.biometrics = {
+          weight: bioData[i][1] !== "" ? Number(bioData[i][1]) : null,
+          subcutaneousFat: bioData[i][2] !== "" ? Number(bioData[i][2]) : null,
+          waistBraced: bioData[i][3] !== "" ? Number(bioData[i][3]) : null,
+          waistRelaxed: bioData[i][4] !== "" ? Number(bioData[i][4]) : null,
+          steps: Number(bioData[i][5] || 0)
+        };
+        day.habits = {
+          vacuums: bioData[i][6] === "YES"
+        };
+        break;
+      }
+    }
+  }
+
+  // 2. Nutrition
+  var nutSheet = ss.getSheetByName(SHEETS.NUTRITION);
+  if (nutSheet && nutSheet.getLastRow() > 1) {
+    var nutData = nutSheet.getDataRange().getValues();
+    for (var j = 1; j < nutData.length; j++) {
+      if (normalizeDateString(nutData[j][0]) === dateStr) {
+        day.meals.push({
+          id: nutData[j][8] || ("m-" + j),
+          time: String(nutData[j][1]),
+          name: String(nutData[j][2]),
+          kcal: Number(nutData[j][3] || 0),
+          protein: Number(nutData[j][4] || 0),
+          carbs: Number(nutData[j][5] || 0),
+          fat: Number(nutData[j][6] || 0),
+          source: String(nutData[j][7] || "manual")
+        });
+      }
+    }
+  }
+
+  // 3. Workouts
+  var wSheet = ss.getSheetByName(SHEETS.WORKOUTS);
+  if (wSheet && wSheet.getLastRow() > 1) {
+    var wData = wSheet.getDataRange().getValues();
+    for (var k = 1; k < wData.length; k++) {
+      if (normalizeDateString(wData[k][0]) === dateStr) {
+        var split = String(wData[k][1] || "upper").toLowerCase();
+        day.workouts.activeSplit = split.includes("lower") ? "lower" : split.includes("med") || split.includes("full") ? "full" : "upper";
+        var exName = String(wData[k][2]);
+        if (!day.workouts.exercises[exName]) {
+          day.workouts.exercises[exName] = [];
+        }
+        day.workouts.exercises[exName].push({
+          set: Number(wData[k][3] || 1),
+          weight: Number(wData[k][4] || 0),
+          reps: Number(wData[k][5] || 0),
+          completed: wData[k][7] === "YES"
+        });
+      }
+    }
+  }
+
+  return day;
+}
+
+/**
+ * Read ALL historical dates from Google Sheets (Two-Way Cloud Pull)
+ */
+function readAllDays(ss) {
+  var daysMap = {};
+
+  function ensureDayKey(d) {
+    if (!daysMap[d]) {
+      daysMap[d] = {
+        biometrics: { weight: null, subcutaneousFat: null, waistBraced: null, waistRelaxed: null, steps: 0 },
+        habits: { vacuums: false },
+        meals: [],
+        workouts: { activeSplit: "upper", exercises: {} },
+        synced: true,
+        lastModified: new Date().toISOString()
+      };
+    }
+    return daysMap[d];
+  }
+
+  // 1. Biometrics
+  var bioSheet = ss.getSheetByName(SHEETS.BIOMETRICS);
+  if (bioSheet && bioSheet.getLastRow() > 1) {
+    var bioData = bioSheet.getDataRange().getValues();
+    for (var i = 1; i < bioData.length; i++) {
+      var dStr = normalizeDateString(bioData[i][0]);
+      if (dStr) {
+        var dayObj = ensureDayKey(dStr);
+        dayObj.biometrics = {
+          weight: bioData[i][1] !== "" ? Number(bioData[i][1]) : null,
+          subcutaneousFat: bioData[i][2] !== "" ? Number(bioData[i][2]) : null,
+          waistBraced: bioData[i][3] !== "" ? Number(bioData[i][3]) : null,
+          waistRelaxed: bioData[i][4] !== "" ? Number(bioData[i][4]) : null,
+          steps: Number(bioData[i][5] || 0)
+        };
+        dayObj.habits = {
+          vacuums: bioData[i][6] === "YES"
+        };
+      }
+    }
+  }
+
+  // 2. Nutrition
+  var nutSheet = ss.getSheetByName(SHEETS.NUTRITION);
+  if (nutSheet && nutSheet.getLastRow() > 1) {
+    var nutData = nutSheet.getDataRange().getValues();
+    for (var j = 1; j < nutData.length; j++) {
+      var dNut = normalizeDateString(nutData[j][0]);
+      if (dNut) {
+        var dayNut = ensureDayKey(dNut);
+        dayNut.meals.push({
+          id: nutData[j][8] || ("m-" + j),
+          time: String(nutData[j][1]),
+          name: String(nutData[j][2]),
+          kcal: Number(nutData[j][3] || 0),
+          protein: Number(nutData[j][4] || 0),
+          carbs: Number(nutData[j][5] || 0),
+          fat: Number(nutData[j][6] || 0),
+          source: String(nutData[j][7] || "manual")
+        });
+      }
+    }
+  }
+
+  // 3. Workouts
+  var wSheet = ss.getSheetByName(SHEETS.WORKOUTS);
+  if (wSheet && wSheet.getLastRow() > 1) {
+    var wData = wSheet.getDataRange().getValues();
+    for (var k = 1; k < wData.length; k++) {
+      var dW = normalizeDateString(wData[k][0]);
+      if (dW) {
+        var dayW = ensureDayKey(dW);
+        var split = String(wData[k][1] || "upper").toLowerCase();
+        dayW.workouts.activeSplit = split.includes("lower") ? "lower" : split.includes("med") || split.includes("full") ? "full" : "upper";
+        var exName = String(wData[k][2]);
+        if (!dayW.workouts.exercises[exName]) {
+          dayW.workouts.exercises[exName] = [];
+        }
+        dayW.workouts.exercises[exName].push({
+          set: Number(wData[k][3] || 1),
+          weight: Number(wData[k][4] || 0),
+          reps: Number(wData[k][5] || 0),
+          completed: wData[k][7] === "YES"
+        });
+      }
+    }
+  }
+
+  return daysMap;
+}
+
+/**
  * Initialize sheets, structure, styling and freeze panes
  */
 function ensureSheetsAndHeaders(ss) {
   var configs = [
     {
       name: SHEETS.BIOMETRICS,
-      headers: ["Date", "Weight (kg)", "Subcut Fat (kg)", "Waist Braced (in)", "Waist Relaxed (in)", "Steps", "Stomach Vacuums", "Cook Oil <=1tsp", "Coke Zero <=1", "Last Synced"]
+      headers: ["Date", "Weight (kg)", "Subcut Fat (kg)", "Waist Braced (in)", "Waist Relaxed (in)", "Steps", "Stomach Vacuums", "Last Synced"]
     },
     {
       name: SHEETS.NUTRITION,
@@ -365,7 +526,7 @@ function ensureSheetsAndHeaders(ss) {
     },
     {
       name: SHEETS.SUMMARY,
-      headers: ["Date", "Weight (kg)", "Calories (kcal)", "Protein (g)", "Carbs (g)", "Fat (g)", "Steps", "Workout Tonnage (kg)", "Habits", "Last Synced"]
+      headers: ["Date", "Weight (kg)", "Calories (kcal)", "Protein (g)", "Carbs (g)", "Fat (g)", "Steps", "Workout Tonnage (kg)", "Vacuums", "Last Synced"]
     }
   ];
 

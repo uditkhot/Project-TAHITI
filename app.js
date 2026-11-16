@@ -125,7 +125,7 @@
 
   // --- GLOBAL STATE ---
   let state = {
-    version: 2.2,
+    version: 2.3,
     settings: {
       geminiApiKey: '',
       geminiModel: 'gemini-2.5-flash',
@@ -179,7 +179,8 @@
         meals: [],
         workouts: {
           activeSplit: 'upper',
-          exercises: {}
+          exercises: {},
+          finishedExercises: []
         },
         synced: false,
         lastModified: new Date().toISOString()
@@ -196,10 +197,13 @@
         state.days[dateStr].meals = [];
       }
       if (!state.days[dateStr].workouts) {
-        state.days[dateStr].workouts = { activeSplit: 'upper', exercises: {} };
+        state.days[dateStr].workouts = { activeSplit: 'upper', exercises: {}, finishedExercises: [] };
       }
       if (!state.days[dateStr].workouts.exercises) {
         state.days[dateStr].workouts.exercises = {};
+      }
+      if (!Array.isArray(state.days[dateStr].workouts.finishedExercises)) {
+        state.days[dateStr].workouts.finishedExercises = [];
       }
     }
     return state.days[dateStr];
@@ -361,12 +365,12 @@
     }
   }
 
-  // 2. Top HUD: Calories, Macros, and Steps
+  // 2. Top Scoped Contextual HUD
   function renderTopHUD() {
     const currentDay = ensureDay(activeDate);
     const targets = state.settings.targets || DEFAULT_TARGETS;
 
-    // Calculate totals for active date
+    // --- HUD 1: Nutrition & Macros ---
     let totalKcal = 0;
     let totalProtein = 0;
     let totalCarbs = 0;
@@ -379,9 +383,6 @@
       totalFat += Number(m.fat || 0);
     });
 
-    const steps = Number(currentDay.biometrics.steps || 0);
-
-    // Calories
     const elKcalCurrent = document.getElementById('hudCaloriesCurrent');
     const elKcalTarget = document.getElementById('hudCaloriesTarget');
     const elKcalBadge = document.getElementById('hudCaloriesRemainingBadge');
@@ -414,32 +415,98 @@
     // Protein
     const pCurrent = Math.round(totalProtein * 10) / 10;
     const pPct = Math.min(100, Math.round((pCurrent / (targets.protein || 1)) * 100));
-    document.getElementById('hudProteinCurrent').textContent = pCurrent;
-    document.getElementById('hudProteinTarget').textContent = `${targets.protein}g`;
-    document.getElementById('hudProteinPct').textContent = `${pPct}%`;
-    document.getElementById('hudProteinBar').style.width = `${pPct}%`;
+    const elPCur = document.getElementById('hudProteinCurrent');
+    const elPTar = document.getElementById('hudProteinTarget');
+    const elPPct = document.getElementById('hudProteinPct');
+    const elPBar = document.getElementById('hudProteinBar');
+    if (elPCur) elPCur.textContent = pCurrent;
+    if (elPTar) elPTar.textContent = `${targets.protein}g`;
+    if (elPPct) elPPct.textContent = `${pPct}%`;
+    if (elPBar) elPBar.style.width = `${pPct}%`;
 
     // Carbs
     const cCurrent = Math.round(totalCarbs * 10) / 10;
     const cPct = Math.min(100, Math.round((cCurrent / (targets.carbs || 1)) * 100));
-    document.getElementById('hudCarbsCurrent').textContent = cCurrent;
-    document.getElementById('hudCarbsTarget').textContent = `${targets.carbs}g`;
-    document.getElementById('hudCarbsPct').textContent = `${cPct}%`;
-    document.getElementById('hudCarbsBar').style.width = `${cPct}%`;
+    const elCCur = document.getElementById('hudCarbsCurrent');
+    const elCTar = document.getElementById('hudCarbsTarget');
+    const elCPct = document.getElementById('hudCarbsPct');
+    const elCBar = document.getElementById('hudCarbsBar');
+    if (elCCur) elCCur.textContent = cCurrent;
+    if (elCTar) elCTar.textContent = `${targets.carbs}g`;
+    if (elCPct) elCPct.textContent = `${cPct}%`;
+    if (elCBar) elCBar.style.width = `${cPct}%`;
 
     // Fat
     const fCurrent = Math.round(totalFat * 10) / 10;
     const fPct = Math.min(100, Math.round((fCurrent / (targets.fat || 1)) * 100));
-    document.getElementById('hudFatCurrent').textContent = fCurrent;
-    document.getElementById('hudFatTarget').textContent = `${targets.fat}g`;
-    document.getElementById('hudFatPct').textContent = `${fPct}%`;
-    document.getElementById('hudFatBar').style.width = `${fPct}%`;
+    const elFCur = document.getElementById('hudFatCurrent');
+    const elFTar = document.getElementById('hudFatTarget');
+    const elFPct = document.getElementById('hudFatPct');
+    const elFBar = document.getElementById('hudFatBar');
+    if (elFCur) elFCur.textContent = fCurrent;
+    if (elFTar) elFTar.textContent = `${targets.fat}g`;
+    if (elFPct) elFPct.textContent = `${fPct}%`;
+    if (elFBar) elFBar.style.width = `${fPct}%`;
 
-    // Steps
-    const stepsPct = Math.min(100, Math.round((steps / (targets.steps || 1)) * 100));
-    document.getElementById('hudStepsCurrent').textContent = steps.toLocaleString();
-    document.getElementById('hudStepsTarget').textContent = (targets.steps || 8000).toLocaleString();
-    document.getElementById('hudStepsBar').style.width = `${stepsPct}%`;
+    const steps = Number(currentDay.biometrics.steps || 0);
+
+    // --- HUD 2: Training Session Matrix ---
+    const activeSplit = currentDay.workouts.activeSplit || 'upper';
+    const splitExercises = state.settings.exercises[activeSplit] || DEFAULT_EXERCISES[activeSplit] || [];
+    const finishedList = currentDay.workouts.finishedExercises || [];
+    const completedCount = splitExercises.filter(ex => finishedList.includes(ex)).length;
+    const totalCount = splitExercises.length;
+    const progressPct = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0;
+
+    let totalTonnage = 0;
+    const exercises = currentDay.workouts.exercises || {};
+    for (const ex in exercises) {
+      if (Array.isArray(exercises[ex])) {
+        exercises[ex].forEach(s => {
+          if (s.weight && s.reps) totalTonnage += Number(s.weight) * Number(s.reps);
+        });
+      }
+    }
+
+    const splitTitles = {
+      upper: 'Upper Body Session',
+      lower: 'Lower & Core Session',
+      full: 'MED Failsafe Session'
+    };
+
+    const elGymTitle = document.getElementById('hudGymActiveSplitTitle');
+    const elGymBadge = document.getElementById('hudGymStatusBadge');
+    const elGymTonnage = document.getElementById('hudGymTonnageVal');
+    const elGymPct = document.getElementById('hudGymProgressPct');
+    const elGymBar = document.getElementById('hudGymProgressBar');
+
+    if (elGymTitle) elGymTitle.textContent = splitTitles[activeSplit] || 'Gym Session';
+    if (elGymBadge) elGymBadge.textContent = `${completedCount} / ${totalCount} Done`;
+    if (elGymTonnage) elGymTonnage.textContent = `${totalTonnage.toLocaleString()} kg`;
+    if (elGymPct) elGymPct.textContent = `${progressPct}%`;
+    if (elGymBar) elGymBar.style.width = `${progressPct}%`;
+
+    // --- HUD 3: Biometric Baseline ---
+    const bio = currentDay.biometrics || {};
+    const habits = currentDay.habits || {};
+
+    const elBioWeight = document.getElementById('hudBioWeightDisplay');
+    const elBioWaist = document.getElementById('hudBioWaistDisplay');
+    const elBioSteps = document.getElementById('hudBioStepsDisplay');
+    const elBioHabit = document.getElementById('hudBioHabitBadge');
+
+    if (elBioWeight) elBioWeight.textContent = bio.weight ? `${bio.weight} kg` : '-';
+    if (elBioWaist) elBioWaist.textContent = bio.waistBraced ? `${bio.waistBraced} in` : '-';
+    if (elBioSteps) elBioSteps.textContent = steps.toLocaleString();
+    if (elBioHabit) {
+      if (habits.vacuums) {
+        elBioHabit.textContent = 'Vacuums: Done';
+        elBioHabit.className = 'text-[10px] font-mono px-2 py-0.5 rounded-full bg-emerald-950/90 text-emerald-300 border border-emerald-500/30';
+      } else {
+        elBioHabit.textContent = 'Vacuums: Pending';
+        elBioHabit.className = 'text-[10px] font-mono px-2 py-0.5 rounded-full bg-slate-800 text-slate-400 border border-slate-700';
+      }
+    }
   }
 
   // 3. Tab 1: Biometrics & Core Habits
@@ -447,21 +514,50 @@
     const day = ensureDay(activeDate);
     const bio = day.biometrics || {};
     const habits = day.habits || {};
+    const targetSteps = (state.settings.targets && state.settings.targets.steps) || 8000;
 
     // Numeric inputs
-    document.getElementById('inputBioWeight').value = bio.weight !== null ? bio.weight : '';
-    document.getElementById('inputBioSubcutFat').value = bio.subcutaneousFat !== null ? bio.subcutaneousFat : '';
-    document.getElementById('inputBioWaistBraced').value = bio.waistBraced !== null ? bio.waistBraced : '';
-    document.getElementById('inputBioWaistRelaxed').value = bio.waistRelaxed !== null ? bio.waistRelaxed : '';
-    document.getElementById('inputBioSteps').value = bio.steps || '';
+    const elWeight = document.getElementById('inputBioWeight');
+    const elFat = document.getElementById('inputBioSubcutFat');
+    const elWaistB = document.getElementById('inputBioWaistBraced');
+    const elWaistR = document.getElementById('inputBioWaistRelaxed');
+    const elSteps = document.getElementById('inputBioSteps');
 
-    // Calculate weight trend compared to previous entry
+    if (elWeight) elWeight.value = bio.weight !== null ? bio.weight : '';
+    if (elFat) elFat.value = bio.subcutaneousFat !== null ? bio.subcutaneousFat : '';
+    if (elWaistB) elWaistB.value = bio.waistBraced !== null ? bio.waistBraced : '';
+    if (elWaistR) elWaistR.value = bio.waistRelaxed !== null ? bio.waistRelaxed : '';
+    if (elSteps) elSteps.value = bio.steps || '';
+
+    // Step Telemetry Card display
+    const steps = Number(bio.steps || 0);
+    const stepsPct = Math.min(100, Math.round((steps / targetSteps) * 100));
+    const rem = targetSteps - steps;
+
+    const elLogged = document.getElementById('bioStepsLoggedDisplay');
+    const elGoal = document.getElementById('bioStepsGoalText');
+    const elBar = document.getElementById('bioStepsProgressBar');
+    const elRem = document.getElementById('bioStepsRemainingBadge');
+
+    if (elLogged) elLogged.textContent = steps.toLocaleString();
+    if (elGoal) elGoal.textContent = targetSteps.toLocaleString();
+    if (elBar) elBar.style.width = `${stepsPct}%`;
+    if (elRem) {
+      if (rem <= 0) {
+        elRem.textContent = `Goal Met! (+${Math.abs(rem).toLocaleString()})`;
+        elRem.className = 'text-[10px] font-mono px-2 py-0.5 rounded-full bg-emerald-950 text-emerald-300 border border-emerald-500/40 shadow-glow-emerald';
+      } else {
+        elRem.textContent = `${rem.toLocaleString()} steps to goal`;
+        elRem.className = 'text-[10px] font-mono px-2 py-0.5 rounded-full bg-slate-900 border border-slate-700 text-fuchsia-300';
+      }
+    }
+
+    // Weight trend
     updateWeightTrendDisplay(bio.weight);
 
-    // Habit toggles
-    document.getElementById('habitVacuums').checked = !!habits.vacuums;
-    document.getElementById('habitCookOil').checked = !!habits.cookOil;
-    document.getElementById('habitCokeZero').checked = !!habits.cokeZero;
+    // Habit toggle (Vacuums)
+    const vacCheck = document.getElementById('habitVacuums');
+    if (vacCheck) vacCheck.checked = !!habits.vacuums;
 
     updateHabitsScoreUI(habits);
   }
@@ -502,19 +598,15 @@
   }
 
   function updateHabitsScoreUI(habits) {
-    let completed = 0;
-    if (habits.vacuums) completed++;
-    if (habits.cookOil) completed++;
-    if (habits.cokeZero) completed++;
-
     const scoreBadge = document.getElementById('habitsScoreBadge');
-    if (scoreBadge) {
-      scoreBadge.textContent = `${completed}/3 Locked`;
-      if (completed === 3) {
-        scoreBadge.className = 'text-[10px] font-mono px-2 py-0.5 rounded-full bg-emerald-950/90 text-emerald-300 border border-emerald-400 shadow-glow-emerald';
-      } else {
-        scoreBadge.className = 'text-[10px] font-mono px-2 py-0.5 rounded-full bg-slate-800 text-slate-300 border border-slate-700';
-      }
+    if (!scoreBadge) return;
+
+    if (habits.vacuums) {
+      scoreBadge.textContent = '1/1 Locked (Done)';
+      scoreBadge.className = 'text-[10px] font-mono px-2 py-0.5 rounded-full bg-emerald-950/90 text-emerald-300 border border-emerald-400 shadow-glow-emerald';
+    } else {
+      scoreBadge.textContent = 'Pending';
+      scoreBadge.className = 'text-[10px] font-mono px-2 py-0.5 rounded-full bg-slate-950 text-slate-400 border border-slate-800';
     }
   }
 
@@ -660,10 +752,11 @@
     }
   }
 
-  // 5. Tab 3: 10:15 AM Gym Logger (Progressive Overload)
+  // 5. Tab 3: 10:15 AM Gym Logger (Progressive Overload & Planned vs Completed)
   function renderTabGym() {
     const day = ensureDay(activeDate);
     const activeSplit = day.workouts.activeSplit || 'upper';
+    day.workouts.finishedExercises = day.workouts.finishedExercises || [];
 
     // Highlight Split Selector Buttons
     document.querySelectorAll('.split-select-btn').forEach((btn) => {
@@ -675,21 +768,28 @@
       }
     });
 
-    // Render Exercises for Active Split
-    const exercisesContainer = document.getElementById('workoutExercisesContainer');
-    if (!exercisesContainer) return;
-    exercisesContainer.innerHTML = '';
+    const plannedContainer = document.getElementById('plannedExercisesContainer');
+    const completedContainer = document.getElementById('completedExercisesContainer');
+    const completedSection = document.getElementById('completedExercisesSection');
+    const plannedDonePlaceholder = document.getElementById('plannedAllDonePlaceholder');
+    const completeBanner = document.getElementById('workoutCompleteBanner');
+
+    if (plannedContainer) plannedContainer.innerHTML = '';
+    if (completedContainer) completedContainer.innerHTML = '';
 
     const splitExercises = state.settings.exercises[activeSplit] || DEFAULT_EXERCISES[activeSplit] || [];
+    const finishedSet = new Set(day.workouts.finishedExercises);
+
+    const plannedList = splitExercises.filter((ex) => !finishedSet.has(ex));
+    const completedList = splitExercises.filter((ex) => finishedSet.has(ex));
+
     let totalTonnage = 0;
 
-    splitExercises.forEach((exName) => {
-      // Query historical top set across all sessions
+    // --- RENDER PLANNED EXERCISES ---
+    plannedList.forEach((exName) => {
       const topSetInfo = getHistoricalTopSet(exName, activeDate);
 
-      // Current session's sets for this exercise
       if (!day.workouts.exercises[exName]) {
-        // Initialize with 3 empty sets if completely uninitialized
         day.workouts.exercises[exName] = [
           { set: 1, weight: '', reps: '', completed: false },
           { set: 2, weight: '', reps: '', completed: false },
@@ -710,7 +810,6 @@
       const card = document.createElement('div');
       card.className = 'bg-slate-900/80 border border-slate-800 rounded-xl p-3.5 space-y-2.5';
 
-      // Header: Exercise Title, Top Set Badge, and Volume
       const topSetBadge = topSetInfo
         ? `<span class="text-[10px] font-mono px-2 py-0.5 rounded bg-cyan-950/80 text-cyan-300 border border-cyan-500/30 flex items-center space-x-1">
              <i data-lucide="zap" class="w-3 h-3 text-cyan-400"></i>
@@ -751,6 +850,12 @@
             <!-- Set rows inserted here -->
           </div>
         </div>
+
+        <!-- Finish Exercise Action Button -->
+        <button type="button" class="finish-movement-btn w-full mt-2 py-1.5 rounded-lg bg-emerald-950/70 hover:bg-emerald-900 border border-emerald-500/40 text-emerald-300 font-mono font-semibold text-xs uppercase flex items-center justify-center space-x-1.5 transition active:scale-95 shadow-glow-emerald" data-ex="${escapeHtml(exName)}">
+          <i data-lucide="check-check" class="w-3.5 h-3.5 text-emerald-400"></i>
+          <span>Finish Movement</span>
+        </button>
       `;
 
       // Render Set Rows
@@ -779,7 +884,6 @@
           </div>
         `;
 
-        // Event listeners for inputs
         const weightInput = row.querySelector('.set-weight-input');
         const repsInput = row.querySelector('.set-reps-input');
         const doneBtn = row.querySelector('.toggle-set-done');
@@ -814,7 +918,6 @@
 
       // Add Set Button
       card.querySelector('.add-set-btn').addEventListener('click', () => {
-        // Pre-fill with last set's weight if available
         const lastSet = sets[sets.length - 1];
         const newWeight = lastSet ? lastSet.weight : '';
         const newReps = lastSet ? lastSet.reps : '';
@@ -823,8 +926,88 @@
         renderTabGym();
       });
 
-      exercisesContainer.appendChild(card);
+      // Finish Movement Button
+      card.querySelector('.finish-movement-btn').addEventListener('click', () => {
+        finishExercise(exName);
+      });
+
+      if (plannedContainer) plannedContainer.appendChild(card);
     });
+
+    // --- RENDER COMPLETED EXERCISES ---
+    completedList.forEach((exName) => {
+      const sets = day.workouts.exercises[exName] || [];
+      let exVolume = 0;
+      let topWeight = 0;
+      let topReps = 0;
+      let validSetsCount = 0;
+
+      const chips = [];
+      sets.forEach((s) => {
+        if (s.weight && s.reps) {
+          validSetsCount++;
+          const w = Number(s.weight);
+          const r = Number(s.reps);
+          const v = w * r;
+          exVolume += v;
+          totalTonnage += v;
+
+          if (w > topWeight || (w === topWeight && r > topReps)) {
+            topWeight = w;
+            topReps = r;
+          }
+
+          chips.push(`<span class="text-[10px] font-mono px-2 py-0.5 rounded bg-slate-950 border border-slate-800 text-slate-300">
+            S${s.set}: <strong class="text-cyan-300">${s.weight}kg</strong> &times; ${s.reps}
+          </span>`);
+        }
+      });
+
+      const card = document.createElement('div');
+      card.className = 'bg-gradient-to-r from-slate-900/90 via-slate-900 to-emerald-950/20 border border-emerald-500/30 rounded-xl p-3 space-y-2';
+
+      card.innerHTML = `
+        <div class="flex items-center justify-between">
+          <div class="flex items-center space-x-2">
+            <i data-lucide="check-circle-2" class="w-4 h-4 text-emerald-400"></i>
+            <h4 class="text-xs font-bold font-mono text-emerald-300">${escapeHtml(exName)}</h4>
+          </div>
+          <button type="button" class="reopen-movement-btn px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-[10px] font-mono text-cyan-300 border border-slate-700 flex items-center space-x-1 transition active:scale-95" data-ex="${escapeHtml(exName)}" title="Reopen this movement to edit sets">
+            <i data-lucide="rotate-ccw" class="w-3 h-3"></i>
+            <span>Reopen</span>
+          </button>
+        </div>
+        <div class="flex items-center justify-between text-[10px] font-mono text-slate-400 border-t border-slate-800/80 pt-1.5">
+          <span>Top: <strong class="text-emerald-300">${topWeight > 0 ? `${topWeight}kg &times; ${topReps}` : 'Logged'}</strong></span>
+          <span>Vol: <strong class="text-cyan-300">${exVolume.toLocaleString()} kg</strong></span>
+          <span class="text-slate-500">${validSetsCount} sets</span>
+        </div>
+        ${chips.length > 0 ? `<div class="flex flex-wrap gap-1 pt-0.5">${chips.join('')}</div>` : ''}
+      `;
+
+      card.querySelector('.reopen-movement-btn').addEventListener('click', () => {
+        reopenExercise(exName);
+      });
+
+      if (completedContainer) completedContainer.appendChild(card);
+    });
+
+    // Update section badges & visibility
+    const plannedBadge = document.getElementById('plannedExercisesBadge');
+    const completedBadge = document.getElementById('completedExercisesBadge');
+
+    if (plannedBadge) plannedBadge.textContent = `${plannedList.length} Pending`;
+    if (completedBadge) completedBadge.textContent = `${completedList.length} Done`;
+
+    if (plannedDonePlaceholder) {
+      plannedDonePlaceholder.classList.toggle('hidden', plannedList.length > 0 || splitExercises.length === 0);
+    }
+    if (completedSection) {
+      completedSection.classList.toggle('hidden', completedList.length === 0);
+    }
+    if (completeBanner) {
+      completeBanner.classList.toggle('hidden', !(plannedList.length === 0 && completedList.length > 0));
+    }
 
     // Update Tonnage Badge
     const tonnageBadge = document.getElementById('gymTonnageBadge');
@@ -832,7 +1015,48 @@
       tonnageBadge.textContent = `${totalTonnage.toLocaleString()} kg Tonnage`;
     }
 
+    renderTopHUD();
+
     if (window.lucide) lucide.createIcons();
+  }
+
+  function finishExercise(exName) {
+    const day = ensureDay(activeDate);
+    day.workouts.finishedExercises = day.workouts.finishedExercises || [];
+    const sets = day.workouts.exercises[exName] || [];
+
+    // Mark any entered sets as completed
+    let hasData = false;
+    sets.forEach((s) => {
+      if (s.weight && s.reps) {
+        s.completed = true;
+        hasData = true;
+      }
+    });
+
+    if (!hasData) {
+      // Auto fill a baseline placeholder set if none entered
+      if (sets.length > 0 && (!sets[0].weight || !sets[0].reps)) {
+        sets[0].completed = true;
+      }
+    }
+
+    if (!day.workouts.finishedExercises.includes(exName)) {
+      day.workouts.finishedExercises.push(exName);
+    }
+
+    saveState();
+    renderTabGym();
+    showToast(`${exName} Completed!`, 'check-circle');
+  }
+
+  function reopenExercise(exName) {
+    const day = ensureDay(activeDate);
+    day.workouts.finishedExercises = day.workouts.finishedExercises || [];
+    day.workouts.finishedExercises = day.workouts.finishedExercises.filter((name) => name !== exName);
+    saveState();
+    renderTabGym();
+    showToast(`${exName} Reopened`, 'rotate-ccw');
   }
 
   function updateTonnageBadge() {
@@ -852,6 +1076,7 @@
     if (tonnageBadge) {
       tonnageBadge.textContent = `${totalTonnage.toLocaleString()} kg Tonnage`;
     }
+    renderTopHUD();
   }
 
   // Query historical top set across all sessions
@@ -1007,7 +1232,7 @@
       }
 
       // Row formatting
-      tableRows.push(`| ${dStr} | ${bio.weight || '-'} | ${bio.subcutaneousFat || '-'} | ${bio.waistBraced || '-'} | ${bio.waistRelaxed || '-'} | ${bio.steps || 0} | ${Math.round(dayKcal)} | ${Math.round(dayP)} | ${Math.round(dayC)} | ${Math.round(dayF)} | ${habits.vacuums ? 'YES' : 'NO'} | ${habits.cookOil ? 'YES' : 'NO'} | ${habits.cokeZero ? 'YES' : 'NO'} |`);
+      tableRows.push(`| ${dStr} | ${bio.weight || '-'} | ${bio.subcutaneousFat || '-'} | ${bio.waistBraced || '-'} | ${bio.waistRelaxed || '-'} | ${bio.steps || 0} | ${Math.round(dayKcal)} | ${Math.round(dayP)} | ${Math.round(dayC)} | ${Math.round(dayF)} | ${habits.vacuums ? 'YES' : 'NO'} |`);
     });
 
     const avgWeight = weightCount > 0 ? (totalWeight / weightCount).toFixed(1) : 'N/A';
@@ -1019,7 +1244,7 @@
 
     const targets = state.settings.targets || DEFAULT_TARGETS;
 
-    const markdown = `# PROJECT TAHITI v2.0 // 7-DAY TELEMETRY UPLINK
+    const markdown = `# PROJECT TAHITI v2.3 // 7-DAY TELEMETRY UPLINK
 **Subject:** Udit Khot | Body Recomposition & Hypertrophy Matrix
 **Window:** ${startDate} to ${endDate} (7 Days)
 **Timestamp:** ${new Date().toISOString()}
@@ -1034,13 +1259,11 @@
 
 ## 2. Core Habit Adherence
 - **Stomach Vacuums (4x20s):** ${vacuumsDone}/7 (${Math.round((vacuumsDone / 7) * 100)}%)
-- **Cook Oil Audit (<=1 tsp):** ${cookOilDone}/7 (${Math.round((cookOilDone / 7) * 100)}%)
-- **Coke Zero Limit (Max 1 Can):** ${cokeZeroDone}/7 (${Math.round((cokeZeroDone / 7) * 100)}%)
 - **Average Morning Fasted Weight:** ${avgWeight} kg
 
 ## 3. Daily Biometrics & Nutrition Matrix
-| Date | Weight (kg) | Subcut (kg) | Waist Braced (in) | Waist Relaxed (in) | Steps | Kcal | P (g) | C (g) | F (g) | Vacuums | Oil Audit | Coke Zero |
-| :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
+| Date | Weight (kg) | Subcut (kg) | Waist Braced (in) | Waist Relaxed (in) | Steps | Kcal | P (g) | C (g) | F (g) | Vacuums |
+| :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
 ${tableRows.join('\n')}
 
 ## 4. Progressive Overload & Training Volume
@@ -1169,7 +1392,224 @@ Estimate realistic portion sizes and account for standard cooking oils. All macr
     }
   }
 
+  // --- INLINE AI MACRO ESTIMATOR (CUSTOM MEAL) ---
+
+  async function estimateCustomMealWithAi() {
+    const nameInput = document.getElementById('quickMacroName');
+    const desc = nameInput ? nameInput.value.trim() : '';
+    const statusEl = document.getElementById('quickAiEstimateStatus');
+    const btnText = document.getElementById('quickAiBtnText');
+    const aiBtn = document.getElementById('quickAiEstimateBtn');
+
+    if (!desc) {
+      if (statusEl) {
+        statusEl.textContent = 'Please enter meal description first.';
+        statusEl.className = 'text-[10px] font-mono text-amber-400';
+        statusEl.classList.remove('hidden');
+      }
+      showToast('Enter meal description first', 'alert-circle');
+      nameInput?.focus();
+      return;
+    }
+
+    const apiKey = state.settings.geminiApiKey;
+    if (!apiKey) {
+      alert('Gemini API key is required for AI estimation. Please add your key in Settings.');
+      switchTab('tabSettings');
+      return;
+    }
+
+    const model = state.settings.geminiModel || 'gemini-2.5-flash';
+
+    try {
+      if (aiBtn) aiBtn.disabled = true;
+      if (btnText) btnText.textContent = 'Estimating...';
+      if (statusEl) {
+        statusEl.textContent = 'Consulting JARVIS AI...';
+        statusEl.className = 'text-[10px] font-mono text-cyan-400';
+        statusEl.classList.remove('hidden');
+      }
+
+      const prompt = `You are JARVIS, an expert precision fitness and nutritional telemetry AI.
+Analyze this meal description with clinical accuracy for body recomposition, calibrated for Indian home cooking, gym diets, and macros.
+Meal description: "${desc}".
+
+Return ONLY a strict JSON object (no markdown, no backticks, no comments) matching:
+{
+  "name": "Concise Descriptive Meal Name",
+  "kcal": 450,
+  "protein": 35.0,
+  "carbs": 42.0,
+  "fat": 14.0
+}`;
+
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(apiKey)}`;
+
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 15000);
+
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        signal: controller.signal,
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }],
+          generationConfig: {
+            responseMimeType: 'application/json',
+            temperature: 0.2
+          }
+        })
+      });
+      clearTimeout(timeoutId);
+
+      if (!response.ok) {
+        const errJson = await response.json().catch(() => ({}));
+        throw new Error(errJson.error?.message || `HTTP ${response.status}`);
+      }
+
+      const resData = await response.json();
+      const rawText = resData.candidates?.[0]?.content?.parts?.[0]?.text;
+      if (!rawText) throw new Error('Empty response from Gemini');
+
+      let cleaned = rawText.trim();
+      if (cleaned.startsWith('```json')) cleaned = cleaned.substring(7);
+      if (cleaned.startsWith('```')) cleaned = cleaned.substring(3);
+      if (cleaned.endsWith('```')) cleaned = cleaned.substring(0, cleaned.length - 3);
+      cleaned = cleaned.trim();
+
+      const parsed = JSON.parse(cleaned);
+
+      if (parsed.name && nameInput) nameInput.value = parsed.name;
+      const elKcal = document.getElementById('quickMacroKcal');
+      const elProt = document.getElementById('quickMacroProtein');
+      const elCarbs = document.getElementById('quickMacroCarbs');
+      const elFat = document.getElementById('quickMacroFat');
+
+      if (elKcal) elKcal.value = Math.round(Number(parsed.kcal || 0));
+      if (elProt) elProt.value = Math.round(Number(parsed.protein || 0) * 10) / 10;
+      if (elCarbs) elCarbs.value = Math.round(Number(parsed.carbs || 0) * 10) / 10;
+      if (elFat) elFat.value = Math.round(Number(parsed.fat || 0) * 10) / 10;
+
+      if (statusEl) {
+        statusEl.textContent = `Estimated: ${elKcal.value} kcal | ${elProt.value}g P | ${elCarbs.value}g C | ${elFat.value}g F`;
+        statusEl.className = 'text-[10px] font-mono text-emerald-400';
+        statusEl.classList.remove('hidden');
+      }
+      showToast('AI Macro Estimation Ready', 'sparkles');
+
+    } catch (err) {
+      console.error('[TAHITI] Quick AI estimate failed:', err);
+      if (statusEl) {
+        statusEl.textContent = `AI estimation error: ${err.message}`;
+        statusEl.className = 'text-[10px] font-mono text-rose-400';
+        statusEl.classList.remove('hidden');
+      }
+      showToast('AI Estimation Failed', 'alert-circle');
+    } finally {
+      if (aiBtn) aiBtn.disabled = false;
+      if (btnText) btnText.textContent = 'Ask AI';
+      if (window.lucide) lucide.createIcons();
+    }
+  }
+
   // --- GOOGLE APPS SCRIPT WEBHOOK SYNC ---
+
+  async function pullFromGoogleSheets(silent = false) {
+    const webhookUrl = state.settings.gasWebhookUrl;
+    if (!webhookUrl) {
+      if (!silent) {
+        alert('Google Apps Script Webhook URL is not configured. Please paste your Web App deployment URL in Settings.');
+        switchTab('tabSettings');
+      }
+      return;
+    }
+
+    const syncStatusBadge = document.getElementById('syncStatusBadge');
+    const syncIcon = document.getElementById('syncIcon');
+    if (syncStatusBadge) syncStatusBadge.textContent = 'PULLING';
+    if (syncIcon) syncIcon.classList.add('animate-spin');
+
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 12000);
+
+    try {
+      const url = webhookUrl.includes('?') ? `${webhookUrl}&action=fetchAll` : `${webhookUrl}?action=fetchAll`;
+      const response = await fetch(url, {
+        method: 'GET',
+        signal: controller.signal
+      });
+      clearTimeout(timeoutId);
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      const res = await response.json();
+      if (res.status === 'success' && res.days && typeof res.days === 'object') {
+        let pulledCount = 0;
+        for (const [d, cloudDay] of Object.entries(res.days)) {
+          if (!state.days[d]) {
+            state.days[d] = cloudDay;
+            pulledCount++;
+          } else {
+            const localDay = state.days[d];
+            if (cloudDay.biometrics) {
+              localDay.biometrics = localDay.biometrics || {};
+              for (const k in cloudDay.biometrics) {
+                if (cloudDay.biometrics[k] !== null && cloudDay.biometrics[k] !== undefined && cloudDay.biometrics[k] !== '') {
+                  if (localDay.biometrics[k] === null || localDay.biometrics[k] === undefined || localDay.biometrics[k] === '') {
+                    localDay.biometrics[k] = cloudDay.biometrics[k];
+                  }
+                }
+              }
+            }
+            if (Array.isArray(cloudDay.meals) && cloudDay.meals.length > 0) {
+              localDay.meals = localDay.meals || [];
+              const existingIds = new Set(localDay.meals.map((m) => m.id));
+              cloudDay.meals.forEach((cm) => {
+                if (!existingIds.has(cm.id)) {
+                  localDay.meals.push(cm);
+                }
+              });
+            }
+            if (cloudDay.workouts && cloudDay.workouts.splits) {
+              localDay.workouts = localDay.workouts || { activeSplit: 'upper', exercises: {}, finishedExercises: [] };
+              localDay.workouts.exercises = localDay.workouts.exercises || {};
+              localDay.workouts.finishedExercises = localDay.workouts.finishedExercises || [];
+              for (const sKey in cloudDay.workouts.splits) {
+                const cloudExMap = cloudDay.workouts.splits[sKey];
+                for (const exName in cloudExMap) {
+                  if (!localDay.workouts.exercises[exName] || localDay.workouts.exercises[exName].length === 0) {
+                    localDay.workouts.exercises[exName] = cloudExMap[exName];
+                  }
+                  if (!localDay.workouts.finishedExercises.includes(exName)) {
+                    localDay.workouts.finishedExercises.push(exName);
+                  }
+                }
+              }
+            }
+            localDay.synced = true;
+          }
+        }
+        saveState();
+        refreshAllUI();
+        if (!silent) {
+          showToast(`Cloud Pull Complete: Synced ${Object.keys(res.days).length} days`, 'cloud-lightning');
+        }
+      } else {
+        if (!silent) showToast('Cloud is up-to-date', 'cloud');
+      }
+    } catch (err) {
+      console.warn('[TAHITI] Pull from cloud warning:', err);
+      if (!silent) {
+        showToast('Pull failed or offline', 'cloud-off');
+      }
+    } finally {
+      clearTimeout(timeoutId);
+      if (syncIcon) syncIcon.classList.remove('animate-spin');
+      updateSyncStatusUI();
+    }
+  }
 
   async function syncToGoogleSheets(syncBulk = false) {
     const webhookUrl = state.settings.gasWebhookUrl;
@@ -1188,12 +1628,17 @@ Estimate realistic portion sizes and account for standard cooking oils. All macr
       ? { action: 'syncBulk', days: state.days }
       : { action: 'syncDay', date: activeDate, dayData: ensureDay(activeDate) };
 
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 12000);
+
     try {
       const response = await fetch(webhookUrl, {
         method: 'POST',
-        headers: { 'Content-Type': 'text/plain;charset=utf-8' }, // Apps Script handles text/plain CORS smoothly
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        signal: controller.signal,
         body: JSON.stringify(payload)
       });
+      clearTimeout(timeoutId);
 
       const result = await response.json().catch(() => ({ status: 'success' }));
 
@@ -1209,15 +1654,19 @@ Estimate realistic portion sizes and account for standard cooking oils. All macr
 
       showToast(syncBulk ? 'All Telemetry Synced to Google Sheets' : "Today's Telemetry Synced to Cloud", 'cloud');
 
+      // After successful push, perform a silent pull to ensure parity
+      pullFromGoogleSheets(true);
+
     } catch (err) {
       console.warn('[TAHITI] Cloud sync failed or CORS restricted:', err);
-      // Note: Google Apps Script redirects with 302 can sometimes trigger opaque responses in browser fetch, but execution still succeeds.
       ensureDay(activeDate).synced = true;
       localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
       updateSyncStatusUI();
       showToast('Sync request dispatched to Google Sheets', 'cloud');
     } finally {
+      clearTimeout(timeoutId);
       if (syncIcon) syncIcon.classList.remove('animate-spin');
+      updateSyncStatusUI();
     }
   }
 
@@ -1246,11 +1695,28 @@ Estimate realistic portion sizes and account for standard cooking oils. All macr
       }
     });
 
+    // Update scoped Top HUD visibility
+    const topHudSection = document.getElementById('topHudSection');
+    const hudNutritionView = document.getElementById('hudNutritionView');
+    const hudTrainingView = document.getElementById('hudTrainingView');
+    const hudBiometricsView = document.getElementById('hudBiometricsView');
+
+    if (targetId === 'tabSettings') {
+      if (topHudSection) topHudSection.classList.add('hidden');
+    } else {
+      if (topHudSection) topHudSection.classList.remove('hidden');
+      if (hudNutritionView) hudNutritionView.classList.toggle('hidden', targetId !== 'tabNutrition');
+      if (hudTrainingView) hudTrainingView.classList.toggle('hidden', targetId !== 'tabGym');
+      if (hudBiometricsView) hudBiometricsView.classList.toggle('hidden', targetId !== 'tabBiometrics');
+    }
+
     // Re-render components of that tab
     if (targetId === 'tabBiometrics') renderTabBiometrics();
     if (targetId === 'tabNutrition') renderTabNutrition();
     if (targetId === 'tabGym') renderTabGym();
     if (targetId === 'tabSettings') renderTabSettings();
+
+    renderTopHUD();
 
     if (window.lucide) lucide.createIcons();
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -1425,6 +1891,9 @@ Estimate realistic portion sizes and account for standard cooking oils. All macr
     document.getElementById('syncNowBtn')?.addEventListener('click', () => {
       syncToGoogleSheets(false);
     });
+    document.getElementById('pullCloudBtn')?.addEventListener('click', () => {
+      pullFromGoogleSheets(false);
+    });
     document.getElementById('syncAllBtn')?.addEventListener('click', () => {
       syncToGoogleSheets(true);
     });
@@ -1445,7 +1914,10 @@ Estimate realistic portion sizes and account for standard cooking oils. All macr
           const day = ensureDay(activeDate);
           day.biometrics[field] = e.target.value === '' ? null : Number(e.target.value);
           saveState();
-          if (field === 'steps') renderTopHUD();
+          if (field === 'steps') {
+            renderTopHUD();
+            renderTabBiometrics();
+          }
           if (field === 'weight') updateWeightTrendDisplay(day.biometrics.weight);
         });
       }
@@ -1461,28 +1933,21 @@ Estimate realistic portion sizes and account for standard cooking oils. All macr
         document.getElementById('inputBioSteps').value = day.biometrics.steps;
         saveState();
         renderTopHUD();
+        renderTabBiometrics();
         showToast(`+${toAdd.toLocaleString()} steps added`, 'footprints');
       });
     });
 
-    // Habit Toggles
-    const habitMap = [
-      { id: 'habitVacuums', key: 'vacuums' },
-      { id: 'habitCookOil', key: 'cookOil' },
-      { id: 'habitCokeZero', key: 'cokeZero' }
-    ];
-
-    habitMap.forEach(({ id, key }) => {
-      const checkbox = document.getElementById(id);
-      if (checkbox) {
-        checkbox.addEventListener('change', (e) => {
-          const day = ensureDay(activeDate);
-          day.habits[key] = e.target.checked;
-          saveState();
-          updateHabitsScoreUI(day.habits);
-        });
-      }
-    });
+    // Habit Toggle (Stomach Vacuums)
+    const vacCheck = document.getElementById('habitVacuums');
+    if (vacCheck) {
+      vacCheck.addEventListener('change', (e) => {
+        const day = ensureDay(activeDate);
+        day.habits.vacuums = e.target.checked;
+        saveState();
+        updateHabitsScoreUI(day.habits);
+      });
+    }
 
     // 5. Tab 2: Modals & Manual Meal
     document.getElementById('openAiModalBtn')?.addEventListener('click', () => {
@@ -1497,6 +1962,11 @@ Estimate realistic portion sizes and account for standard cooking oils. All macr
     });
     document.getElementById('closeManualModalBtn')?.addEventListener('click', () => {
       document.getElementById('manualMealModal').classList.add('hidden');
+    });
+
+    // Inline AI Estimate Button
+    document.getElementById('quickAiEstimateBtn')?.addEventListener('click', () => {
+      estimateCustomMealWithAi();
     });
 
     // Inline Quick Macro Form Submit (Offline / Zero-API)
@@ -1888,8 +2358,8 @@ Estimate realistic portion sizes and account for standard cooking oils. All macr
     const tabParam = urlParams.get('tab');
     if (tabParam === 'nutrition') switchTab('tabNutrition');
     else if (tabParam === 'gym') switchTab('tabGym');
-    else if (tabParam === 'biometrics') switchTab('tabBiometrics');
     else if (tabParam === 'settings') switchTab('tabSettings');
+    else switchTab('tabBiometrics');
   }
 
   function checkUrlPairing() {
@@ -1919,7 +2389,13 @@ Estimate realistic portion sizes and account for standard cooking oils. All macr
     checkUrlPairing();
     setupEventListeners();
     refreshAllUI();
-    console.log('[TAHITI] Project TAHITI v2.0 Initialized.');
+
+    // Auto-sync from cloud if webhook is configured
+    if (state.settings.gasWebhookUrl) {
+      pullFromGoogleSheets(true);
+    }
+
+    console.log('[TAHITI] Project TAHITI v2.3 Initialized.');
   });
 
 })();

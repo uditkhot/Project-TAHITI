@@ -174,10 +174,12 @@
 
 
     <!-- ================================================================= -->
-    <!-- TOP HUD: LIVE CALORIE & MACRO TELEMETRY GAUGES -->
+    <!-- TOP CONTEXTUAL HUD: NUTRITION, TRAINING, & BIOMETRIC GAUGES -->
     <!-- ================================================================= -->
-    <section class="px-4 pt-3 pb-2">
-      <div class="bg-gradient-to-b from-slate-900/90 to-slate-925/90 border border-cyan-500/25 rounded-xl p-3.5 shadow-glow-cyan-sm relative scanline-effect">
+    <section id="topHudSection" class="px-4 pt-3 pb-2">
+      
+      <!-- HUD 1: NUTRITION & MACROS (ACTIVE ON TAB 2 NUTRITION) -->
+      <div id="hudNutritionView" class="bg-gradient-to-b from-slate-900/90 to-slate-925/90 border border-cyan-500/25 rounded-xl p-3.5 shadow-glow-cyan-sm relative scanline-effect">
         
         <!-- CALORIE HERO GAUGE -->
         <div class="flex items-end justify-between mb-2">
@@ -259,21 +261,61 @@
 
         </div>
 
-        <!-- STEP TRACKER MINI HUD -->
-        <div class="mt-2.5 pt-2 border-t border-slate-800/60 flex items-center justify-between">
+      </div>
+
+      <!-- HUD 2: TRAINING SESSION MATRIX (ACTIVE ON TAB 3 TRAINING) -->
+      <div id="hudTrainingView" class="hidden bg-gradient-to-b from-slate-900/90 to-slate-925/90 border border-cyan-500/25 rounded-xl p-3.5 shadow-glow-cyan-sm relative scanline-effect">
+        <div class="flex items-center justify-between mb-2">
           <div class="flex items-center space-x-2">
-            <i data-lucide="footprints" class="w-3.5 h-3.5 text-fuchsia-400"></i>
-            <span class="text-[11px] font-mono text-slate-300">Daily Steps:</span>
-            <span id="hudStepsCurrent" class="text-xs font-mono font-bold text-fuchsia-300">0</span>
-            <span class="text-[10px] font-mono text-slate-500">/</span>
-            <span id="hudStepsTarget" class="text-[10px] font-mono text-slate-400">8000</span>
+            <i data-lucide="dumbbell" class="w-4 h-4 text-cyan-400"></i>
+            <span class="text-xs font-mono font-bold uppercase tracking-wider text-cyan-300" id="hudGymActiveSplitTitle">Upper Body Session</span>
           </div>
-          <div class="w-24 bg-slate-950 rounded-full h-1.5 overflow-hidden border border-slate-800">
-            <div id="hudStepsBar" class="h-full bg-fuchsia-400 transition-all duration-300 rounded-full" style="width: 0%"></div>
+          <span id="hudGymStatusBadge" class="text-[10px] font-mono px-2 py-0.5 rounded-full bg-cyan-950/90 text-cyan-300 border border-cyan-500/30">
+            0 / 8 Done
+          </span>
+        </div>
+        <div class="grid grid-cols-2 gap-2 text-xs font-mono pt-1 border-t border-slate-800">
+          <div>
+            <span class="text-[10px] text-slate-400 block uppercase">Session Tonnage</span>
+            <span id="hudGymTonnageVal" class="text-base font-bold text-cyan-300">0 kg</span>
+          </div>
+          <div class="text-right">
+            <span class="text-[10px] text-slate-400 block uppercase">Split Progress</span>
+            <span id="hudGymProgressPct" class="text-base font-bold text-emerald-300">0%</span>
           </div>
         </div>
-
+        <div class="w-full bg-slate-950 rounded-full h-1.5 overflow-hidden border border-slate-800 mt-2">
+          <div id="hudGymProgressBar" class="h-full bg-gradient-to-r from-cyan-400 to-emerald-400 transition-all duration-300 rounded-full" style="width: 0%"></div>
+        </div>
       </div>
+
+      <!-- HUD 3: BIOMETRIC RECOMP METRICS (ACTIVE ON TAB 1 BIOMETRICS) -->
+      <div id="hudBiometricsView" class="hidden bg-gradient-to-b from-slate-900/90 to-slate-925/90 border border-cyan-500/25 rounded-xl p-3.5 shadow-glow-cyan-sm relative scanline-effect">
+        <div class="flex items-center justify-between mb-2">
+          <div class="flex items-center space-x-2">
+            <i data-lucide="activity" class="w-4 h-4 text-cyan-400"></i>
+            <span class="text-xs font-mono font-bold uppercase tracking-wider text-cyan-300">Morning Recomp Baseline</span>
+          </div>
+          <span id="hudBioHabitBadge" class="text-[10px] font-mono px-2 py-0.5 rounded-full bg-slate-800 text-slate-300 border border-slate-700">
+            Vacuums: Pending
+          </span>
+        </div>
+        <div class="grid grid-cols-3 gap-2 text-xs font-mono pt-1 border-t border-slate-800">
+          <div>
+            <span class="text-[9px] text-slate-400 block uppercase">Weight</span>
+            <span id="hudBioWeightDisplay" class="text-sm font-bold text-cyan-300">-</span>
+          </div>
+          <div>
+            <span class="text-[9px] text-slate-400 block uppercase">Waist Braced</span>
+            <span id="hudBioWaistDisplay" class="text-sm font-bold text-sky-300">-</span>
+          </div>
+          <div>
+            <span class="text-[9px] text-slate-400 block uppercase">Daily Steps</span>
+            <span id="hudBioStepsDisplay" class="text-sm font-bold text-fuchsia-300">0</span>
+          </div>
+        </div>
+      </div>
+
     </section>
 
 
@@ -338,22 +380,39 @@
           </div>
         </div>
 
-        <!-- Daily Steps Input -->
-        <div class="mt-3 bg-slate-950/70 border border-slate-800 rounded-lg p-3">
-          <div class="flex items-center justify-between mb-1.5">
+        <!-- Daily Steps Telemetry Card -->
+        <div class="mt-3 bg-slate-950/70 border border-slate-800 rounded-lg p-3 space-y-2">
+          <div class="flex items-center justify-between">
             <label class="text-[10px] font-mono text-slate-400 uppercase flex items-center space-x-1.5">
               <i data-lucide="footprints" class="w-3.5 h-3.5 text-fuchsia-400"></i>
               <span>Daily Step Telemetry</span>
             </label>
+            <div class="flex items-center space-x-1">
+              <span id="bioStepsRemainingBadge" class="text-[10px] font-mono px-2 py-0.5 rounded-full bg-slate-900 border border-slate-700 text-fuchsia-300">
+                Target: 8,000
+              </span>
+            </div>
+          </div>
+
+          <!-- Progress bar -->
+          <div class="w-full bg-slate-900 rounded-full h-2 overflow-hidden border border-slate-800">
+            <div id="bioStepsProgressBar" class="h-full bg-gradient-to-r from-fuchsia-500 to-cyan-400 transition-all duration-300 rounded-full" style="width: 0%"></div>
+          </div>
+
+          <div class="flex items-center justify-between text-[11px] font-mono">
+            <span class="text-slate-400">
+              Logged: <span id="bioStepsLoggedDisplay" class="font-bold text-fuchsia-300">0</span> / <span id="bioStepsGoalText" class="text-slate-400">8000</span> steps
+            </span>
             <div class="flex items-center space-x-1">
               <button type="button" class="step-quick-add px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-[10px] font-mono text-fuchsia-300" data-add="1000">+1k</button>
               <button type="button" class="step-quick-add px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-[10px] font-mono text-fuchsia-300" data-add="2000">+2k</button>
               <button type="button" class="step-quick-add px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-[10px] font-mono text-fuchsia-300" data-add="5000">+5k</button>
             </div>
           </div>
+
           <div class="relative">
-            <input type="number" step="100" id="inputBioSteps" placeholder="8000"
-              class="w-full bg-slate-900 border border-slate-700/80 focus:border-fuchsia-400 rounded px-2.5 py-1.5 text-sm font-mono text-fuchsia-300 focus:outline-none transition">
+            <input type="number" step="100" id="inputBioSteps" placeholder="Enter steps walked today (e.g. 4500)"
+              class="w-full bg-slate-900 border border-slate-700/80 focus:border-fuchsia-400 rounded px-2.5 py-1.5 text-sm font-mono text-fuchsia-300 placeholder:text-slate-600 focus:outline-none transition">
             <span class="absolute right-2.5 top-2 text-[10px] font-mono text-slate-500">STEPS</span>
           </div>
         </div>
@@ -363,52 +422,26 @@
       <section class="bg-slate-900/80 border border-slate-800 rounded-xl p-4">
         <div class="flex items-center justify-between mb-3">
           <div class="flex items-center space-x-2">
-            <i data-lucide="check-circle-2" class="w-4 h-4 text-emerald-400"></i>
-            <h2 class="text-xs font-bold font-mono tracking-wider text-emerald-300 uppercase">Daily Non-Negotiables</h2>
+            <i data-lucide="check-circle-2" class="w-4 h-4 text-cyan-400"></i>
+            <h2 class="text-xs font-bold font-mono tracking-wider text-cyan-300 uppercase">Daily Non-Negotiable</h2>
           </div>
-          <span id="habitsScoreBadge" class="text-[10px] font-mono px-2 py-0.5 rounded-full bg-emerald-950/80 text-emerald-300 border border-emerald-500/30">
-            0/3 Locked
+          <span id="habitsScoreBadge" class="text-[10px] font-mono px-2 py-0.5 rounded-full bg-slate-950 text-slate-400 border border-slate-800">
+            Pending
           </span>
         </div>
 
         <div class="space-y-2.5">
-          
-          <!-- Habit 1: Stomach Vacuums -->
+          <!-- Habit: Stomach Vacuums -->
           <label class="flex items-center justify-between p-3 rounded-lg bg-slate-950/70 border border-slate-800 hover:border-slate-700 cursor-pointer transition">
             <div class="flex items-start space-x-3">
               <input type="checkbox" id="habitVacuums" class="mt-0.5 w-4 h-4 rounded text-cyan-400 focus:ring-cyan-500 focus:ring-offset-slate-950 border-slate-700 bg-slate-900">
               <div>
                 <span class="text-xs font-mono font-semibold text-slate-200 block">Stomach Vacuums (4x20s)</span>
-                <span class="text-[10px] font-mono text-slate-400 block">Morning transversus abdominis activation</span>
+                <span class="text-[10px] font-mono text-slate-400 block">Morning transversus abdominis activation & waist tapering</span>
               </div>
             </div>
             <i data-lucide="wind" class="w-4 h-4 text-cyan-400/60"></i>
           </label>
-
-          <!-- Habit 2: Cook Oil Audit -->
-          <label class="flex items-center justify-between p-3 rounded-lg bg-slate-950/70 border border-slate-800 hover:border-slate-700 cursor-pointer transition">
-            <div class="flex items-start space-x-3">
-              <input type="checkbox" id="habitCookOil" class="mt-0.5 w-4 h-4 rounded text-emerald-400 focus:ring-emerald-500 focus:ring-offset-slate-950 border-slate-700 bg-slate-900">
-              <div>
-                <span class="text-xs font-mono font-semibold text-slate-200 block">Cook Oil Audit (&le;1 tsp)</span>
-                <span class="text-[10px] font-mono text-slate-400 block">Zero unmetered oils or heavy gravies</span>
-              </div>
-            </div>
-            <i data-lucide="droplet" class="w-4 h-4 text-emerald-400/60"></i>
-          </label>
-
-          <!-- Habit 3: Coke Zero Limit -->
-          <label class="flex items-center justify-between p-3 rounded-lg bg-slate-950/70 border border-slate-800 hover:border-slate-700 cursor-pointer transition">
-            <div class="flex items-start space-x-3">
-              <input type="checkbox" id="habitCokeZero" class="mt-0.5 w-4 h-4 rounded text-amber-400 focus:ring-amber-500 focus:ring-offset-slate-950 border-slate-700 bg-slate-900">
-              <div>
-                <span class="text-xs font-mono font-semibold text-slate-200 block">Coke Zero Limit (Max 1 Can)</span>
-                <span class="text-[10px] font-mono text-slate-400 block">Appetite discipline & sweetener check</span>
-              </div>
-            </div>
-            <i data-lucide="cup-soda" class="w-4 h-4 text-amber-400/60"></i>
-          </label>
-
         </div>
       </section>
 
@@ -453,11 +486,17 @@
         </div>
 
         <form id="quickMacroForm" class="space-y-2 font-mono text-xs">
-          <!-- Meal Name Input -->
-          <div>
-            <input type="text" id="quickMacroName" placeholder="Meal Name (e.g. Veggie Avocado Cheese Sandwich)" required
-              class="w-full bg-slate-950 border border-slate-700/80 focus:border-cyan-400 rounded-lg px-2.5 py-1.5 text-xs text-slate-200 placeholder:text-slate-600 focus:outline-none transition">
+          <!-- Meal Description / Name Input with Inline AI Estimate Button -->
+          <div class="flex items-center space-x-1.5">
+            <input type="text" id="quickMacroName" placeholder="Describe meal (e.g. 2 phulkas, 150g grilled chicken)" required
+              class="flex-1 bg-slate-950 border border-slate-700/80 focus:border-cyan-400 rounded-lg px-2.5 py-1.5 text-xs text-slate-200 placeholder:text-slate-600 focus:outline-none transition">
+            <button type="button" id="quickAiEstimateBtn" title="Ask Gemini AI to estimate macros from description"
+              class="px-2.5 py-1.5 rounded-lg bg-cyan-950 hover:bg-cyan-900 border border-cyan-500/50 hover:border-cyan-400 text-cyan-300 font-bold text-xs uppercase flex items-center space-x-1 transition active:scale-95 whitespace-nowrap shadow-glow-cyan-sm">
+              <i data-lucide="sparkles" class="w-3.5 h-3.5 text-cyan-400"></i>
+              <span id="quickAiBtnText">Ask AI</span>
+            </button>
           </div>
+          <div id="quickAiEstimateStatus" class="hidden text-[10px] font-mono text-cyan-400 flex items-center space-x-1"></div>
 
           <!-- Numeric Macros Row -->
           <div class="grid grid-cols-4 gap-1.5">
@@ -570,9 +609,51 @@
         </div>
       </section>
 
-      <!-- EXERCISES PROGRESSIVE OVERLOAD CONTAINER -->
-      <div id="workoutExercisesContainer" class="space-y-3">
-        <!-- Exercise cards injected here -->
+      <!-- PLANNED EXERCISES SECTION -->
+      <section class="space-y-2.5">
+        <div class="flex items-center justify-between px-1">
+          <div class="flex items-center space-x-2">
+            <i data-lucide="list-todo" class="w-4 h-4 text-cyan-400"></i>
+            <h3 class="text-xs font-mono font-bold uppercase tracking-wider text-cyan-300">Planned Exercises</h3>
+          </div>
+          <span id="plannedExercisesBadge" class="text-[10px] font-mono px-2 py-0.5 rounded-full bg-slate-900 text-cyan-300 border border-slate-700">
+            0 Pending
+          </span>
+        </div>
+        <!-- Planned cards container -->
+        <div id="plannedExercisesContainer" class="space-y-3">
+          <!-- Active exercise cards with set loggers and finish button -->
+        </div>
+        <div id="plannedAllDonePlaceholder" class="hidden text-center py-5 bg-slate-900/40 border border-slate-800 rounded-xl text-slate-500 font-mono text-xs">
+          <i data-lucide="check-check" class="w-5 h-5 mx-auto mb-1 text-emerald-400"></i>
+          <div>All planned exercises completed for this split!</div>
+        </div>
+      </section>
+
+      <!-- COMPLETED EXERCISES SECTION -->
+      <section id="completedExercisesSection" class="space-y-2.5 pt-2 border-t border-slate-800/80">
+        <div class="flex items-center justify-between px-1">
+          <div class="flex items-center space-x-2">
+            <i data-lucide="check-circle" class="w-4 h-4 text-emerald-400"></i>
+            <h3 class="text-xs font-mono font-bold uppercase tracking-wider text-emerald-300">Completed Today</h3>
+          </div>
+          <span id="completedExercisesBadge" class="text-[10px] font-mono px-2 py-0.5 rounded-full bg-emerald-950/80 text-emerald-300 border border-emerald-500/30">
+            0 Done
+          </span>
+        </div>
+        <!-- Completed cards container -->
+        <div id="completedExercisesContainer" class="space-y-2">
+          <!-- Compact completed exercise cards with logged sets, top set, tonnage, and edit/reopen button -->
+        </div>
+      </section>
+
+      <!-- WORKOUT COMPLETE CELEBRATION BANNER -->
+      <div id="workoutCompleteBanner" class="hidden p-4 rounded-xl bg-gradient-to-r from-emerald-950/80 via-slate-900 to-cyan-950/80 border border-emerald-500/40 text-center space-y-1 shadow-glow-emerald">
+        <div class="flex items-center justify-center space-x-2 text-emerald-400">
+          <i data-lucide="trophy" class="w-5 h-5"></i>
+          <span class="text-xs font-mono font-bold uppercase tracking-wider">Session Objectives Conquered</span>
+        </div>
+        <div class="text-[11px] font-mono text-slate-300" id="workoutCompleteSubtext">All scheduled movements completed. Hypertrophy stimulus delivered.</div>
       </div>
 
     </main>
@@ -622,14 +703,18 @@
           <span class="text-[10px] font-mono text-slate-500 mt-1 block">Deploy Code.gs as Web App (Anyone access) & paste execution URL</span>
         </div>
 
-        <div class="flex items-center space-x-2 pt-1">
-          <button id="syncNowBtn" class="flex-1 py-1.5 px-3 rounded bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs font-mono text-cyan-300 transition flex items-center justify-center space-x-1.5">
+        <div class="grid grid-cols-3 gap-1.5 pt-1">
+          <button id="syncNowBtn" class="py-1.5 px-2 rounded bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs font-mono text-cyan-300 transition flex items-center justify-center space-x-1" title="Upload local changes to Google Sheets">
             <i data-lucide="upload-cloud" class="w-3.5 h-3.5"></i>
-            <span>Sync Today's Data</span>
+            <span>Push Day</span>
           </button>
-          <button id="syncAllBtn" class="py-1.5 px-3 rounded bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs font-mono text-slate-300 transition flex items-center justify-center space-x-1.5" title="Sync entire local history to Google Sheets">
+          <button id="pullCloudBtn" class="py-1.5 px-2 rounded bg-cyan-950/80 hover:bg-cyan-900 border border-cyan-500/40 text-xs font-mono text-cyan-300 transition flex items-center justify-center space-x-1" title="Download all data from Google Sheets to this device">
+            <i data-lucide="download-cloud" class="w-3.5 h-3.5"></i>
+            <span>Pull Cloud</span>
+          </button>
+          <button id="syncAllBtn" class="py-1.5 px-2 rounded bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs font-mono text-slate-300 transition flex items-center justify-center space-x-1" title="Sync entire local history to Google Sheets">
             <i data-lucide="database" class="w-3.5 h-3.5"></i>
-            <span>Sync All Days</span>
+            <span>Push All</span>
           </button>
         </div>
       </section>
