@@ -651,42 +651,109 @@
     renderLoggedMealsFeed();
   }
 
+  function getFrequentMeals(limit = 6) {
+    if (!state.days) return [];
+
+    const mealMap = new Map();
+
+    Object.keys(state.days).forEach((dateKey) => {
+      const day = state.days[dateKey];
+      if (!day || !Array.isArray(day.meals)) return;
+
+      day.meals.forEach((meal) => {
+        if (!meal || !meal.name) return;
+        const rawName = meal.name.trim();
+        if (!rawName) return;
+
+        const normKey = rawName.toLowerCase();
+        const mealTimestamp = dateKey + ' ' + (meal.time || '00:00');
+
+        if (!mealMap.has(normKey)) {
+          mealMap.set(normKey, {
+            name: rawName,
+            count: 0,
+            kcal: Math.round(Number(meal.kcal || 0)),
+            protein: Math.round(Number(meal.protein || 0)),
+            carbs: Math.round(Number(meal.carbs || 0)),
+            fat: Math.round(Number(meal.fat || 0)),
+            lastLogged: mealTimestamp
+          });
+        }
+
+        const entry = mealMap.get(normKey);
+        entry.count += 1;
+        if (mealTimestamp >= entry.lastLogged) {
+          entry.name = rawName;
+          entry.kcal = Math.round(Number(meal.kcal || 0));
+          entry.protein = Math.round(Number(meal.protein || 0));
+          entry.carbs = Math.round(Number(meal.carbs || 0));
+          entry.fat = Math.round(Number(meal.fat || 0));
+          entry.lastLogged = mealTimestamp;
+        }
+      });
+    });
+
+    return Array.from(mealMap.values())
+      .sort((a, b) => {
+        if (b.count !== a.count) return b.count - a.count;
+        return b.lastLogged.localeCompare(a.lastLogged);
+      })
+      .slice(0, limit);
+  }
+
   function renderPresetsList() {
     const container = document.getElementById('presetsContainer');
     if (!container) return;
 
-    const presets = state.settings.presets || DEFAULT_PRESETS;
+    const frequentMeals = getFrequentMeals(6);
     container.innerHTML = '';
 
-    presets.forEach((preset) => {
+    if (frequentMeals.length === 0) {
+      container.innerHTML = `
+        <div class="p-3.5 rounded-lg border border-dashed border-slate-800 bg-slate-950/40 text-center space-y-1 font-mono">
+          <div class="flex items-center justify-center space-x-1.5 text-slate-400 text-xs">
+            <i data-lucide="sparkles" class="w-3.5 h-3.5 text-cyan-400"></i>
+            <span class="font-bold text-slate-300">No Frequently Logged Meals Yet</span>
+          </div>
+          <p class="text-[10px] text-slate-500 leading-relaxed max-w-sm mx-auto">
+            Log your meals via the Quick Macro Logger or Photo AI below. Your most frequent meals will appear here automatically for 1-tap re-logging!
+          </p>
+        </div>
+      `;
+      if (window.lucide) lucide.createIcons();
+      return;
+    }
+
+    frequentMeals.forEach((meal) => {
       const card = document.createElement('div');
       card.className = 'p-2.5 rounded-lg bg-slate-950/80 border border-slate-800 hover:border-cyan-500/40 transition flex items-center justify-between group cursor-pointer active:scale-[0.99]';
       
+      const badgeText = meal.count > 1 ? `Logged ${meal.count}×` : 'Logged 1×';
+
       card.innerHTML = `
         <div class="flex-1 mr-2">
           <div class="flex items-center space-x-1.5 mb-1">
-            <span class="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-cyan-950/80 text-cyan-300 border border-cyan-500/30">${escapeHtml(preset.time || 'MEAL')}</span>
-            <span class="text-xs font-semibold text-slate-200 line-clamp-1">${escapeHtml(preset.name)}</span>
+            <span class="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-cyan-950/80 text-cyan-300 border border-cyan-500/30">${badgeText}</span>
+            <span class="text-xs font-semibold text-slate-200 line-clamp-1">${escapeHtml(meal.name)}</span>
           </div>
           <div class="flex items-center space-x-2 text-[10px] font-mono text-slate-400">
-            <span class="text-cyan-400 font-bold">${preset.kcal} kcal</span>
+            <span class="text-cyan-400 font-bold">${meal.kcal} kcal</span>
             <span>&bull;</span>
-            <span class="text-sky-300 font-semibold">${preset.protein}g P</span>
+            <span class="text-sky-300 font-semibold">${meal.protein}g P</span>
             <span>&bull;</span>
-            <span class="text-emerald-300">${preset.carbs}g C</span>
+            <span class="text-emerald-300">${meal.carbs}g C</span>
             <span>&bull;</span>
-            <span class="text-amber-300">${preset.fat}g F</span>
+            <span class="text-amber-300">${meal.fat}g F</span>
           </div>
         </div>
-        <button type="button" class="preset-log-btn px-2.5 py-1.5 rounded-md bg-cyan-950/90 hover:bg-cyan-500 text-cyan-300 hover:text-slate-950 border border-cyan-500/40 font-mono text-xs font-bold transition flex items-center space-x-1 shadow-glow-cyan-sm" data-id="${preset.id}">
+        <button type="button" class="preset-log-btn px-2.5 py-1.5 rounded-md bg-cyan-950/90 hover:bg-cyan-500 text-cyan-300 hover:text-slate-950 border border-cyan-500/40 font-mono text-xs font-bold transition flex items-center space-x-1 shadow-glow-cyan-sm">
           <i data-lucide="plus" class="w-3.5 h-3.5"></i>
           <span>LOG</span>
         </button>
       `;
 
-      // Entire card or button logs the preset
-      card.addEventListener('click', (e) => {
-        logPresetMeal(preset);
+      card.addEventListener('click', () => {
+        logFrequentMeal(meal);
       });
 
       container.appendChild(card);
@@ -695,24 +762,29 @@
     if (window.lucide) lucide.createIcons();
   }
 
-  function logPresetMeal(preset) {
+  function logFrequentMeal(meal) {
     const day = ensureDay(activeDate);
     const newMeal = {
-      id: 'm-' + Date.now() + '-' + Math.random().toString(36).substr(2, 4),
-      time: preset.time || formatTimeNow(),
-      name: preset.name,
-      kcal: Number(preset.kcal || 0),
-      protein: Number(preset.protein || 0),
-      carbs: Number(preset.carbs || 0),
-      fat: Number(preset.fat || 0),
-      source: 'preset'
+      id: 'frequent-' + Date.now() + '-' + Math.random().toString(36).substr(2, 4),
+      time: formatTimeNow(),
+      name: meal.name,
+      kcal: Number(meal.kcal || 0),
+      protein: Number(meal.protein || 0),
+      carbs: Number(meal.carbs || 0),
+      fat: Number(meal.fat || 0),
+      source: 'frequent'
     };
 
     day.meals.push(newMeal);
     saveState();
     renderTopHUD();
     renderLoggedMealsFeed();
-    showToast(`Logged: ${preset.name.split(' - ')[0]} (+${preset.protein}g P)`, 'check-circle');
+    renderPresetsList();
+    showToast(`Logged: ${meal.name.split(' - ')[0]} (+${meal.protein}g P)`, 'check-circle');
+  }
+
+  function logPresetMeal(preset) {
+    logFrequentMeal(preset);
   }
 
   function renderLoggedMealsFeed() {
@@ -783,6 +855,7 @@
       saveState();
       renderTopHUD();
       renderLoggedMealsFeed();
+      renderPresetsList();
       showToast(`Removed: ${removed.name}`, 'trash');
     }
   }
@@ -1754,42 +1827,7 @@ Return ONLY a strict JSON object (no markdown, no backticks, no comments) matchi
       .replace(/'/g, '&#039;');
   }
 
-  // --- PRESET MANAGER MODAL LOGIC ---
 
-  function openPresetManager() {
-    const modal = document.getElementById('presetManagerModal');
-    const list = document.getElementById('presetManagerList');
-    if (!modal || !list) return;
-
-    list.innerHTML = '';
-    const presets = state.settings.presets || [];
-
-    presets.forEach((p, idx) => {
-      const item = document.createElement('div');
-      item.className = 'bg-slate-950 p-2.5 rounded border border-slate-800 flex items-center justify-between';
-      item.innerHTML = `
-        <div class="flex-1 mr-2">
-          <div class="font-bold text-slate-200 text-xs">${escapeHtml(p.name)}</div>
-          <div class="text-[10px] text-slate-400 font-mono">${p.kcal} kcal | ${p.protein}g P | ${p.carbs}g C | ${p.fat}g F</div>
-        </div>
-        <button type="button" class="del-preset-btn text-slate-500 hover:text-rose-400 p-1" data-idx="${idx}">
-          <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
-        </button>
-      `;
-
-      item.querySelector('.del-preset-btn').addEventListener('click', () => {
-        presets.splice(idx, 1);
-        saveState();
-        openPresetManager();
-        renderPresetsList();
-      });
-
-      list.appendChild(item);
-    });
-
-    if (window.lucide) lucide.createIcons();
-    modal.classList.remove('hidden');
-  }
 
   // --- EXERCISE ROUTINE MANAGER MODAL LOGIC ---
 
@@ -1953,13 +1991,6 @@ Return ONLY a strict JSON object (no markdown, no backticks, no comments) matchi
       document.getElementById('aiVisionModal').classList.add('hidden');
     });
 
-    document.getElementById('openManualModalBtn')?.addEventListener('click', () => {
-      document.getElementById('manualMealModal').classList.remove('hidden');
-    });
-    document.getElementById('closeManualModalBtn')?.addEventListener('click', () => {
-      document.getElementById('manualMealModal').classList.add('hidden');
-    });
-
     // Inline AI Estimate Button
     document.getElementById('quickAiEstimateBtn')?.addEventListener('click', () => {
       estimateCustomMealWithAi();
@@ -1991,39 +2022,12 @@ Return ONLY a strict JSON object (no markdown, no backticks, no comments) matchi
       saveState();
       renderTopHUD();
       renderLoggedMealsFeed();
+      renderPresetsList();
+      renderPresetsList();
 
       // Reset form
       document.getElementById('quickMacroForm').reset();
       showToast(`Logged: ${name} (+${protein}g P)`, 'check-circle');
-    });
-
-    // Manual Meal Form Submit
-    document.getElementById('manualMealForm')?.addEventListener('submit', (e) => {
-      e.preventDefault();
-      const name = document.getElementById('manualMealName').value.trim();
-      const kcal = Number(document.getElementById('manualMealKcal').value || 0);
-      const protein = Number(document.getElementById('manualMealProtein').value || 0);
-      const carbs = Number(document.getElementById('manualMealCarbs').value || 0);
-      const fat = Number(document.getElementById('manualMealFat').value || 0);
-
-      const day = ensureDay(activeDate);
-      day.meals.push({
-        id: 'm-' + Date.now(),
-        time: formatTimeNow(),
-        name: name,
-        kcal: kcal,
-        protein: protein,
-        carbs: carbs,
-        fat: fat,
-        source: 'manual'
-      });
-
-      saveState();
-      renderTopHUD();
-      renderLoggedMealsFeed();
-      document.getElementById('manualMealModal').classList.add('hidden');
-      document.getElementById('manualMealForm').reset();
-      showToast(`Logged: ${name}`, 'check-circle');
     });
 
     // AI Vision: Dropzone & Image Selection
@@ -2094,6 +2098,7 @@ Return ONLY a strict JSON object (no markdown, no backticks, no comments) matchi
       saveState();
       renderTopHUD();
       renderLoggedMealsFeed();
+      renderPresetsList();
 
       // Close modal & reset
       document.getElementById('aiVisionModal').classList.add('hidden');
@@ -2170,59 +2175,6 @@ Return ONLY a strict JSON object (no markdown, no backticks, no comments) matchi
       saveState();
       renderTopHUD();
       showToast('Daily Recomp Targets Updated', 'target');
-    });
-
-    // Presets Manager Modal
-    document.getElementById('openPresetManagerBtn')?.addEventListener('click', openPresetManager);
-    document.getElementById('closePresetManagerBtn')?.addEventListener('click', () => {
-      document.getElementById('presetManagerModal').classList.add('hidden');
-    });
-    document.getElementById('donePresetManagerBtn')?.addEventListener('click', () => {
-      document.getElementById('presetManagerModal').classList.add('hidden');
-    });
-
-    document.getElementById('addNewPresetBtn')?.addEventListener('click', () => {
-      const name = document.getElementById('newPresetName').value.trim();
-      const kcal = Number(document.getElementById('newPresetKcal').value || 0);
-      const p = Number(document.getElementById('newPresetProtein').value || 0);
-      const c = Number(document.getElementById('newPresetCarbs').value || 0);
-      const f = Number(document.getElementById('newPresetFat').value || 0);
-
-      if (!name) {
-        alert('Please enter a preset name');
-        return;
-      }
-
-      state.settings.presets.push({
-        id: 'p-' + Date.now(),
-        time: formatTimeNow(),
-        name: name,
-        kcal: kcal,
-        protein: p,
-        carbs: c,
-        fat: f
-      });
-
-      document.getElementById('newPresetName').value = '';
-      document.getElementById('newPresetKcal').value = '';
-      document.getElementById('newPresetProtein').value = '';
-      document.getElementById('newPresetCarbs').value = '';
-      document.getElementById('newPresetFat').value = '';
-
-      saveState();
-      openPresetManager();
-      renderPresetsList();
-      showToast(`Added Preset: ${name}`, 'plus');
-    });
-
-    document.getElementById('restoreDefaultPresetsBtn')?.addEventListener('click', () => {
-      if (confirm('Restore the 8 factory default nutrition presets?')) {
-        state.settings.presets = JSON.parse(JSON.stringify(DEFAULT_PRESETS));
-        saveState();
-        openPresetManager();
-        renderPresetsList();
-        showToast('Default Presets Restored', 'refresh-cw');
-      }
     });
 
     // Exercise Routine Manager Modal

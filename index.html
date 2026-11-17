@@ -459,14 +459,14 @@
     <!-- ================================================================= -->
     <main id="tabNutrition" class="tab-pane hidden px-4 py-2 space-y-4">
       
-      <!-- 1-TAP PRESET NUTRITION MATRIX -->
+      <!-- FREQUENTLY LOGGED MEALS (DYNAMIC LEARNED QUICK-PICKS) -->
       <section class="bg-slate-900/80 border border-slate-800 rounded-xl p-4">
         <div class="flex items-center justify-between mb-3">
           <div class="flex items-center space-x-2">
-            <i data-lucide="zap" class="w-4 h-4 text-cyan-400"></i>
-            <h2 class="text-xs font-bold font-mono tracking-wider text-cyan-300 uppercase">Clockwork 1-Tap Presets</h2>
+            <i data-lucide="history" class="w-4 h-4 text-cyan-400"></i>
+            <h2 class="text-xs font-bold font-mono tracking-wider text-cyan-300 uppercase">Frequently Logged Meals</h2>
           </div>
-          <span class="text-[10px] font-mono text-slate-400">Instant Macro Logging</span>
+          <span class="text-[10px] font-mono text-slate-400">Learned Quick-Picks</span>
         </div>
 
         <!-- PRESETS CONTAINER -->
@@ -482,7 +482,10 @@
             <i data-lucide="plus-circle" class="w-4 h-4 text-cyan-400"></i>
             <h2 class="text-xs font-bold font-mono tracking-wider text-cyan-300 uppercase">Quick Macro Logger</h2>
           </div>
-          <span class="text-[10px] font-mono text-slate-400">Offline / Zero API</span>
+          <button type="button" id="openAiModalBtn" class="px-2.5 py-1 rounded-md bg-slate-950 border border-cyan-500/40 hover:border-cyan-400 text-cyan-300 text-[10px] font-mono font-bold flex items-center space-x-1.5 transition active:scale-95 shadow-glow-cyan-sm" title="Open JARVIS AI Photo & Multimodal Analyzer">
+            <i data-lucide="camera" class="w-3.5 h-3.5 text-cyan-400"></i>
+            <span>Photo AI</span>
+          </button>
         </div>
 
         <form id="quickMacroForm" class="space-y-2 font-mono text-xs">
@@ -525,30 +528,9 @@
           <!-- Submit Button -->
           <button type="submit" id="quickMacroSubmitBtn" class="w-full py-1.5 rounded-lg bg-cyan-950 hover:bg-cyan-900/80 border border-cyan-500/40 hover:border-cyan-400 text-cyan-300 font-bold text-xs uppercase tracking-wider transition flex items-center justify-center space-x-1.5 active:scale-95 shadow-glow-cyan-sm">
             <i data-lucide="plus" class="w-3.5 h-3.5"></i>
-            <span>Log Custom Meal</span>
+            <span>Log Meal</span>
           </button>
         </form>
-      </section>
-
-      <!-- OFF-MENU LOGGING ACTIONS (AI VISION & MANUAL) -->
-      <section class="grid grid-cols-2 gap-2.5">
-        <!-- AI Vision Trigger -->
-        <button id="openAiModalBtn" class="p-3 rounded-xl bg-gradient-to-r from-cyan-950/80 to-slate-900 border border-cyan-500/40 hover:border-cyan-400 text-left transition active:scale-95 shadow-glow-cyan-sm">
-          <div class="flex items-center space-x-2 text-cyan-400 mb-1">
-            <i data-lucide="sparkles" class="w-4 h-4 animate-spin text-cyan-300" style="animation-duration: 6s;"></i>
-            <span class="text-xs font-bold font-mono tracking-wider">JARVIS AI VISION</span>
-          </div>
-          <div class="text-[10px] font-mono text-slate-300 leading-tight">Photo & description off-menu analyzer</div>
-        </button>
-
-        <!-- Quick Manual Entry Trigger -->
-        <button id="openManualModalBtn" class="p-3 rounded-xl bg-slate-900/90 border border-slate-700/80 hover:border-slate-600 text-left transition active:scale-95">
-          <div class="flex items-center space-x-2 text-slate-200 mb-1">
-            <i data-lucide="plus-circle" class="w-4 h-4 text-cyan-400"></i>
-            <span class="text-xs font-bold font-mono tracking-wider">CUSTOM MEAL</span>
-          </div>
-          <div class="text-[10px] font-mono text-slate-400 leading-tight">Manual macro entry with custom values</div>
-        </button>
       </section>
 
       <!-- TODAY'S LOGGED MEALS FEED -->
@@ -781,22 +763,18 @@
         </button>
       </section>
 
-      <!-- PRESET MEALS & EXERCISES MANAGERS (COLLAPSIBLE) -->
+      <!-- EXERCISE ROUTINE MANAGER -->
       <section class="bg-slate-900/80 border border-slate-800 rounded-xl p-4 space-y-3">
         <div class="flex items-center justify-between">
           <div class="flex items-center space-x-2">
-            <i data-lucide="sliders" class="w-4 h-4 text-cyan-400"></i>
-            <h2 class="text-xs font-bold font-mono tracking-wider text-slate-200 uppercase">Routines & Presets</h2>
+            <i data-lucide="dumbbell" class="w-4 h-4 text-cyan-400"></i>
+            <h2 class="text-xs font-bold font-mono tracking-wider text-slate-200 uppercase">Workout Routines</h2>
           </div>
         </div>
 
         <div class="space-y-2">
-          <button id="openPresetManagerBtn" class="w-full py-2 px-3 rounded bg-slate-950 border border-slate-800 hover:border-slate-700 text-xs font-mono text-slate-300 flex items-center justify-between">
-            <span>Manage 1-Tap Nutrition Presets</span>
-            <i data-lucide="chevron-right" class="w-3.5 h-3.5 text-slate-500"></i>
-          </button>
           <button id="openExerciseManagerBtn" class="w-full py-2 px-3 rounded bg-slate-950 border border-slate-800 hover:border-slate-700 text-xs font-mono text-slate-300 flex items-center justify-between">
-            <span>Manage Workout Exercises</span>
+            <span>Manage Workout Exercises (Splits & Hardware)</span>
             <i data-lucide="chevron-right" class="w-3.5 h-3.5 text-slate-500"></i>
           </button>
         </div>
@@ -985,111 +963,6 @@
 
         </div>
 
-      </div>
-    </div>
-
-
-    <!-- ================================================================= -->
-    <!-- MODAL: QUICK CUSTOM MEAL ENTRY -->
-    <!-- ================================================================= -->
-    <div id="manualMealModal" class="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-end sm:items-center justify-center p-0 sm:p-4 hidden">
-      <div class="bg-slate-900 border border-slate-700 rounded-t-2xl sm:rounded-2xl w-full max-w-lg overflow-hidden shadow-2xl flex flex-col font-mono">
-        <div class="p-4 border-b border-slate-800 flex items-center justify-between bg-slate-950">
-          <div class="flex items-center space-x-2 text-slate-200">
-            <i data-lucide="plus-circle" class="w-4 h-4 text-cyan-400"></i>
-            <h3 class="text-xs font-bold uppercase tracking-wider">Log Custom Meal</h3>
-          </div>
-          <button id="closeManualModalBtn" class="text-slate-400 hover:text-white p-1">
-            <i data-lucide="x" class="w-5 h-5"></i>
-          </button>
-        </div>
-
-        <form id="manualMealForm" class="p-4 space-y-3 text-xs">
-          <div>
-            <label class="block text-[10px] text-slate-400 uppercase mb-1">Meal Title</label>
-            <input type="text" id="manualMealName" required placeholder="e.g. Greek Yogurt with Walnuts"
-              class="w-full bg-slate-950 border border-slate-700 focus:border-cyan-400 rounded px-2.5 py-1.5 text-slate-200 focus:outline-none">
-          </div>
-
-          <div class="grid grid-cols-4 gap-2">
-            <div>
-              <label class="block text-[10px] text-slate-400 mb-1">Calories</label>
-              <input type="number" id="manualMealKcal" required placeholder="kcal"
-                class="w-full bg-slate-950 border border-slate-700 rounded px-2 py-1.5 text-cyan-300 text-center font-bold">
-            </div>
-            <div>
-              <label class="block text-[10px] text-sky-400 mb-1">Protein (g)</label>
-              <input type="number" step="0.1" id="manualMealProtein" required placeholder="P"
-                class="w-full bg-slate-950 border border-slate-700 rounded px-2 py-1.5 text-sky-300 text-center font-bold">
-            </div>
-            <div>
-              <label class="block text-[10px] text-emerald-400 mb-1">Carbs (g)</label>
-              <input type="number" step="0.1" id="manualMealCarbs" required placeholder="C"
-                class="w-full bg-slate-950 border border-slate-700 rounded px-2 py-1.5 text-emerald-300 text-center font-bold">
-            </div>
-            <div>
-              <label class="block text-[10px] text-amber-400 mb-1">Fat (g)</label>
-              <input type="number" step="0.1" id="manualMealFat" required placeholder="F"
-                class="w-full bg-slate-950 border border-slate-700 rounded px-2 py-1.5 text-amber-300 text-center font-bold">
-            </div>
-          </div>
-
-          <button type="submit" class="w-full py-2.5 mt-2 rounded-lg bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold uppercase tracking-wider text-xs transition">
-            Add to Today's Log
-          </button>
-        </form>
-      </div>
-    </div>
-
-
-    <!-- ================================================================= -->
-    <!-- MODAL: PRESET MANAGER (EDIT / ADD PRESETS) -->
-    <!-- ================================================================= -->
-    <div id="presetManagerModal" class="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-end sm:items-center justify-center p-0 sm:p-4 hidden">
-      <div class="bg-slate-900 border border-slate-700 rounded-t-2xl sm:rounded-2xl w-full max-w-lg overflow-hidden shadow-2xl flex flex-col max-h-[85vh] font-mono">
-        <div class="p-4 border-b border-slate-800 flex items-center justify-between bg-slate-950">
-          <div class="flex items-center space-x-2 text-cyan-400">
-            <i data-lucide="sliders" class="w-4 h-4"></i>
-            <h3 class="text-xs font-bold uppercase tracking-wider">Manage 1-Tap Presets</h3>
-          </div>
-          <button id="closePresetManagerBtn" class="text-slate-400 hover:text-white p-1">
-            <i data-lucide="x" class="w-5 h-5"></i>
-          </button>
-        </div>
-
-        <div class="p-4 space-y-4 overflow-y-auto flex-1 text-xs">
-          <!-- Preset List -->
-          <div id="presetManagerList" class="space-y-2">
-            <!-- Preset items rendered here -->
-          </div>
-
-          <!-- Add New Preset Form -->
-          <div class="border-t border-slate-800 pt-3">
-            <h4 class="text-[11px] font-bold text-slate-300 uppercase mb-2">Create New 1-Tap Preset</h4>
-            <div class="space-y-2">
-              <input type="text" id="newPresetName" placeholder="Preset Name (e.g. 2 Scoops Whey + Almonds)"
-                class="w-full bg-slate-950 border border-slate-700 rounded px-2.5 py-1.5 text-xs text-slate-200">
-              <div class="grid grid-cols-4 gap-1.5">
-                <input type="number" id="newPresetKcal" placeholder="Kcal" class="bg-slate-950 border border-slate-700 rounded px-1.5 py-1 text-cyan-300 text-center">
-                <input type="number" id="newPresetProtein" placeholder="Prot (g)" class="bg-slate-950 border border-slate-700 rounded px-1.5 py-1 text-sky-300 text-center">
-                <input type="number" id="newPresetCarbs" placeholder="Carb (g)" class="bg-slate-950 border border-slate-700 rounded px-1.5 py-1 text-emerald-300 text-center">
-                <input type="number" id="newPresetFat" placeholder="Fat (g)" class="bg-slate-950 border border-slate-700 rounded px-1.5 py-1 text-amber-300 text-center">
-              </div>
-              <button id="addNewPresetBtn" class="w-full py-1.5 rounded bg-cyan-950 border border-cyan-500/40 text-cyan-300 font-semibold text-xs hover:bg-cyan-900">
-                + Add Preset
-              </button>
-            </div>
-          </div>
-        </div>
-
-        <div class="p-3 border-t border-slate-800 bg-slate-950 flex justify-between">
-          <button id="restoreDefaultPresetsBtn" class="text-[10px] text-slate-400 hover:text-cyan-400 underline">
-            Restore 8 Factory Presets
-          </button>
-          <button id="donePresetManagerBtn" class="px-4 py-1.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold">
-            Done
-          </button>
-        </div>
       </div>
     </div>
 
